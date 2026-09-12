@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Receptionist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --primary:#2563EB; --primary-dark:#1d4ed8; --secondary:#14B8A6;
+    --success:#16A34A; --success-bg:#e9f8ee;
+    --warning:#F59E0B; --warning-bg:#fef6e7;
+    --error:#DC2626; --error-bg:#fdecec;
+    --info:#3B82F6; --info-bg:#eaf1fe;
+    --bg:#F8FAFC; --surface:#FFFFFF; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0;
+    --radius:12px; --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; font-size:16px; }
+  .wrap{ max-width:640px; margin:0 auto; padding:var(--s3) var(--s2) 60px; }
+  header.brand{ padding:var(--s3) var(--s2); background:var(--surface); border-bottom:1px solid var(--border); margin-bottom:var(--s2); display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  header.brand .eyebrow{ font-size:14px; color:var(--text-muted); margin:0 0 2px; font-weight:500; }
+  header.brand h1{ margin:0; font-size:22px; font-weight:700; }
+  h2{ font-size:20px; font-weight:700; margin:0 0 4px; }
+  h3{ font-size:16px; font-weight:600; margin:var(--s2) 0 var(--s1); }
+  p.instruction{ color:var(--text-muted); margin-top:0; }
+  label{ display:block; font-weight:600; margin-bottom:6px; font-size:15px; }
+  input[type=text], input[type=password], input[type=search]{
+    width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px;
+  }
+  .search-result{
+    border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); margin-bottom:var(--s1); background:var(--surface);
+  }
+  .search-result .patient-name{ font-weight:700; display:block; }
+  .search-result .patient-contact{ color:var(--text-muted); font-size:14px; display:block; margin-bottom:var(--s1); }
+  .search-result ul{ list-style:none; padding:0; margin:0; }
+  .search-result li{ padding:6px 0; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:var(--s1); flex-wrap:wrap; }
+  .search-result li:first-of-type{ border-top:none; }
+  .search-result .appt-info{ font-size:15px; }
+  .search-result .other-location-note{ color:var(--text-muted); font-size:13px; font-style:italic; }
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:var(--s1); margin:var(--s2) 0; }
+  .stat-box{ border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); background:var(--surface); text-align:center; }
+  .stat-box .stat-number{ display:block; font-size:28px; font-weight:700; }
+  .stat-box .stat-label{ display:block; font-size:14px; color:var(--text-muted); margin-top:2px; }
+  #main-nav[hidden]{ display:none; }
+  #main-nav{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--s3); padding-bottom:var(--s2); border-bottom:1px solid var(--border); }
+  .field{ margin-bottom:var(--s2); }
+  .error-text{ color:var(--error); font-size:14px; margin-top:6px; font-weight:600; }
+  .error-banner{ background:var(--error-bg); border:1px solid #f5b5b5; color:var(--error); padding:var(--s1) var(--s2); border-radius:var(--radius); margin-bottom:var(--s2); font-weight:600; }
+  button:focus-visible, a:focus-visible, input:focus-visible{ outline:3px solid var(--primary); outline-offset:2px; }
+  button.primary{
+    width:100%; min-height:44px; padding:12px var(--s2); font-size:16px; font-weight:600; font-family:inherit;
+    background:var(--primary); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; margin-top:var(--s1);
+  }
+  button.primary:hover{ background:var(--primary-dark); }
+  button.primary:disabled{ background:#93A6C9; cursor:not-allowed; }
+  button.logout-btn{
+    background:none; border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:var(--radius);
+    font-size:14px; font-family:inherit; cursor:pointer; min-height:40px; flex-shrink:0;
+  }
+  a.forgot-link{ display:inline-block; margin-top:var(--s2); color:var(--primary); font-size:14px; }
+  .summary-line{
+    background:var(--info-bg); border:1px solid #c7dafc; border-radius:var(--radius); padding:var(--s1) var(--s2);
+    margin-bottom:var(--s2); font-weight:600; color:var(--primary-dark); font-size:15px;
+  }
+  .top-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  button.small-btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--primary-dark); padding:8px 14px;
+    border-radius:var(--radius); font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; min-height:40px;
+  }
+  ul.appt-list{ list-style:none; padding:0; margin:0; }
+  ul.appt-list li{ margin-bottom:var(--s1); }
+  .appt-card{
+    width:100%; text-align:left; padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--surface); font-size:16px; font-family:inherit; color:var(--text);
+  }
+  .appt-card .time{ font-weight:700; }
+  .appt-card .who{ display:block; margin-top:2px; }
+  .appt-card .loc{ display:block; margin-top:2px; color:var(--text-muted); font-size:14px; }
+  .appt-card .status{ display:inline-block; margin-top:6px; font-size:13px; font-weight:700; padding:2px 10px; border-radius:12px; }
+  .status.booked{ background:var(--info-bg); color:var(--primary-dark); }
+  .status.arrived{ background:var(--warning-bg); color:#92400e; }
+  .status.with-practitioner{ background:#ede9fe; color:#6d28d9; }
+  .status.completed{ background:var(--success-bg); color:#15803d; }
+  .status.cancelled{ background:var(--error-bg); color:#b91c1c; }
+  .status.no-show{ background:#f1f5f9; color:var(--text-muted); }
+  .no-appts{ color:var(--text-muted); padding:var(--s2) 0; }
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .loading-text{ color:var(--text-muted); padding:var(--s2) 0; }
+  .back-btn{
+    background:none; border:none; color:var(--primary); font-size:15px; font-weight:600; font-family:inherit;
+    cursor:pointer; padding:8px 0; margin-bottom:var(--s1); min-height:44px;
+  }
+  dl.detail-list{ margin:var(--s2) 0; }
+  dl.detail-list dt{ font-weight:600; font-size:14px; color:var(--text-muted); margin-top:var(--s1); }
+  dl.detail-list dd{ margin:0; font-size:16px; }
+  .action-row{ display:flex; flex-wrap:wrap; gap:var(--s1); margin:var(--s2) 0; }
+  .action-row button{
+    min-height:44px; padding:10px 16px; border-radius:var(--radius); font-size:15px; font-weight:600; font-family:inherit; cursor:pointer;
+    background:var(--primary); color:#fff; border:none;
+  }
+  .action-row button.danger{ background:#fff; color:var(--error); border:2px solid var(--error); }
+  .confirm-dialog{
+    background:var(--warning-bg); border:1px solid #f3d9a8; border-radius:var(--radius); padding:var(--s2); margin:var(--s2) 0;
+  }
+  .confirm-dialog p{ margin:0 0 var(--s1); font-weight:600; }
+  .confirm-dialog .action-row{ margin:0; }
+  ul.timeline{ list-style:none; padding:0; margin:var(--s1) 0 0; border-left:2px solid var(--border); padding-left:var(--s2); }
+  ul.timeline li{ margin-bottom:var(--s1); font-size:14px; }
+  ul.timeline .event-time{ color:var(--text-muted); display:block; font-size:13px; }
+</style>
+</head>
+<body>
+
+<header class="brand">
+  <div>
+    <p class="eyebrow" id="brand-eyebrow">Atlas — Receptionist</p>
+    <h1 id="page-title">Sign In</h1>
+  </div>
+  <button type="button" class="logout-btn" id="logout-btn" hidden>Log out</button>
+</header>
+
+<main class="wrap">
+  <div aria-live="polite" class="visually-hidden" id="live-region"></div>
+  <div id="error-area"></div>
+
+  <nav id="main-nav" hidden aria-label="Quick navigation">
+    <button type="button" class="small-btn" id="today-nav-btn">Today's Schedule</button>
+    <button type="button" class="small-btn" id="search-nav-btn">Search</button>
+    <button type="button" class="small-btn" id="book-nav-btn">Book Appointment</button>
+    <button type="button" class="small-btn" id="emergency-nav-btn">Emergency / Walk-in</button>
+    <button type="button" class="small-btn" id="ps-nav-btn">Practitioner Schedule</button>
+    <button type="button" class="small-btn" id="loc-nav-btn">Locations</button>
+    <button type="button" class="small-btn" id="upcoming-nav-btn">Upcoming Appointments</button>
+    <button type="button" class="small-btn" id="eod-nav-btn">End of Day</button>
+    <button type="button" class="small-btn" id="wq-nav-btn">Add Walk-in to Queue</button>
+    <button type="button" class="small-btn" id="queue-nav-btn">Queue</button>
+  </nav>
+
+  <!-- LOGIN -->
+  <section id="screen-login">
+    <h2 id="login-heading" tabindex="-1">Welcome back</h2>
+    <p class="instruction">Sign in with your Atlas staff account.</p>
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="text" id="login-email" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="primary" id="login-btn">Sign in</button>
+    </form>
+    <a href="#" class="forgot-link" id="forgot-link">Forgot password?</a>
+  </section>
+
+  <!-- HOME: TODAY'S SCHEDULE -->
+  <section id="screen-today" hidden>
+    <h2 id="today-heading" tabindex="-1">Today's Schedule</h2>
+    <p class="instruction" id="today-date"></p>
+    <div class="summary-line" id="summary-line"></div>
+
+    <div class="top-row" style="margin-top:var(--s3);">
+      <h3 style="margin:0;">Appointments</h3>
+      <button type="button" class="small-btn" id="show-all-toggle" aria-pressed="false">Show all</button>
+    </div>
+    <ul class="appt-list" id="appt-list"></ul>
+  </section>
+
+  <!-- BOOK: CHOOSE PRACTITIONER -->
+  <section id="screen-book-practitioner" hidden>
+    <h2 id="book-practitioner-heading" tabindex="-1">Book an appointment</h2>
+    <p class="instruction">Choose a practitioner.</p>
+    <ul class="appt-list" id="book-practitioner-list"></ul>
+    <button type="button" class="back-btn" id="book-practitioner-back">Cancel and return</button>
+  </section>
+
+  <!-- BOOK: CHOOSE SLOT -->
+  <section id="screen-book-slot" hidden>
+    <h2 id="book-slot-heading" tabindex="-1">Choose a time</h2>
+    <ul class="appt-list" id="book-slot-list"></ul>
+    <button type="button" class="small-btn" id="book-load-more-btn" hidden>Load more dates</button>
+    <button type="button" class="back-btn" id="book-slot-back">Back</button>
+  </section>
+
+  <!-- BOOK: PATIENT -->
+  <section id="screen-book-patient" hidden>
+    <h2 id="book-patient-heading" tabindex="-1">Patient details</h2>
+    <p class="instruction" id="book-patient-subheading"></p>
+
+    <div id="book-patient-search-area">
+      <div class="field">
+        <label for="book-patient-search">Search for an existing patient</label>
+        <input type="search" id="book-patient-search" placeholder="Start typing a name or number...">
+      </div>
+      <div id="book-patient-results"></div>
+      <button type="button" class="small-btn" id="book-new-patient-btn">+ New patient instead</button>
+    </div>
+
+    <div id="book-selected-patient" hidden>
+      <div class="summary-line" id="book-selected-summary"></div>
+      <button type="button" class="small-btn" id="book-change-patient-btn">Change patient</button>
+    </div>
+
+    <form id="book-new-patient-form" hidden novalidate>
+      <div class="field">
+        <label for="book-first-name">First name</label>
+        <input type="text" id="book-first-name">
+        <div class="error-text" id="book-first-name-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-surname">Surname</label>
+        <input type="text" id="book-surname">
+        <div class="error-text" id="book-surname-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-email">Email</label>
+        <input type="text" id="book-email" autocomplete="email">
+        <div class="error-text" id="book-email-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-mobile">Mobile number</label>
+        <input type="text" id="book-mobile" autocomplete="tel">
+        <div class="error-text" id="book-mobile-error" hidden></div>
+      </div>
+      <button type="submit" class="primary">Use these details</button>
+    </form>
+
+    <div id="book-reason-area" hidden>
+      <div class="field">
+        <label for="book-reason">Reason for visit (optional)</label>
+        <input type="text" id="book-reason">
+      </div>
+      <button type="button" class="primary" id="book-confirm-btn">Confirm booking</button>
+    </div>
+
+    <button type="button" class="back-btn" id="book-patient-back">Back</button>
+  </section>
+
+  <!-- BOOK: CONFIRMATION -->
+  <section id="screen-book-confirm" hidden>
+    <h2 id="book-confirm-heading" tabindex="-1">Booking confirmed</h2>
+    <p class="instruction" id="book-confirm-text"></p>
+    <button type="button" class="primary" id="book-another-btn">Book another appointment</button>
+    <button type="button" class="back-btn" id="book-confirm-back">Back to Today's Schedule</button>
+  </section>
+
+  <!-- EMERGENCY: CHOOSE PRACTITIONER -->
+  <section id="screen-em-practitioner" hidden>
+    <h2 id="em-practitioner-heading" tabindex="-1">Emergency / Walk-in</h2>
+    <p class="instruction">Choose a practitioner.</p>
+    <ul class="appt-list" id="em-practitioner-list"></ul>
+    <button type="button" class="back-btn" id="em-practitioner-back">Cancel and return</button>
+  </section>
+
+  <!-- EMERGENCY: DETAILS -->
+  <section id="screen-em-details" hidden>
+    <h2 id="em-details-heading" tabindex="-1"></h2>
+    <p class="instruction">Check today's schedule below, then fit this patient in.</p>
+    <h3>Today's existing schedule</h3>
+    <ul class="appt-list" id="em-existing-list"></ul>
+
+    <h3>Patient</h3>
+    <div id="em-patient-search-area">
+      <div class="field">
+        <label for="em-patient-search">Search for an existing patient</label>
+        <input type="search" id="em-patient-search" placeholder="Start typing a name or number...">
+      </div>
+      <div id="em-patient-results"></div>
+      <button type="button" class="small-btn" id="em-new-patient-btn">+ New patient instead</button>
+    </div>
+
+    <div id="em-selected-patient" hidden>
+      <div class="summary-line" id="em-selected-summary"></div>
+      <button type="button" class="small-btn" id="em-change-patient-btn">Change patient</button>
+    </div>
+
+    <form id="em-new-patient-form" hidden novalidate>
+      <div class="field">
+        <label for="em-first-name">First name</label>
+        <input type="text" id="em-first-name">
+        <div class="error-text" id="em-first-name-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="em-surname">Surname</label>
+        <input type="text" id="em-surname">
+        <div class="error-text" id="em-surname-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="em-email">Email</label>
+        <input type="text" id="em-email" autocomplete="email">
+        <div class="error-text" id="em-email-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="em-mobile">Mobile number</label>
+        <input type="text" id="em-mobile" autocomplete="tel">
+        <div class="error-text" id="em-mobile-error" hidden></div>
+      </div>
+      <button type="submit" class="primary">Use these details</button>
+    </form>
+
+    <div id="em-time-reason-area" hidden>
+      <h3>Time and reason</h3>
+      <div class="field">
+        <label for="em-time">Time to fit them in (HH:MM)</label>
+        <input type="text" id="em-time" placeholder="e.g. 14:30">
+        <div class="error-text" id="em-time-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="em-reason">Reason this needs to happen now</label>
+        <input type="text" id="em-reason">
+        <div class="error-text" id="em-reason-error" hidden></div>
+      </div>
+      <button type="button" class="primary" id="em-confirm-btn">Fit patient in</button>
+    </div>
+
+    <div id="em-confirm-area"></div>
+    <button type="button" class="back-btn" id="em-details-back">Back</button>
+  </section>
+
+  <!-- EMERGENCY: DONE -->
+  <section id="screen-em-done" hidden>
+    <h2 id="em-done-heading" tabindex="-1">Patient fitted in</h2>
+    <p class="instruction" id="em-done-text"></p>
+    <button type="button" class="primary" id="em-another-btn">Fit in another patient</button>
+    <button type="button" class="back-btn" id="em-done-back">Back to Today's Schedule</button>
+  </section>
+
+  <!-- ADD WALK-IN TO QUEUE -->
+  <section id="screen-wq-patient" hidden>
+    <h2 id="wq-patient-heading" tabindex="-1">Add Walk-in to Queue</h2>
+    <p class="instruction">No appointment time or practitioner is needed — they'll join the waiting list.</p>
+
+    <div id="wq-location-area" hidden>
+      <div class="field">
+        <label for="wq-location-select">Which location are they at?</label>
+        <select id="wq-location-select"></select>
+      </div>
+    </div>
+
+    <div id="wq-patient-search-area">
+      <div class="field">
+        <label for="wq-patient-search">Search for an existing patient</label>
+        <input type="search" id="wq-patient-search" placeholder="Start typing a name or number...">
+      </div>
+      <div id="wq-patient-results"></div>
+      <button type="button" class="small-btn" id="wq-new-patient-btn">+ New patient instead</button>
+    </div>
+
+    <div id="wq-selected-patient" hidden>
+      <div class="summary-line" id="wq-selected-summary"></div>
+      <button type="button" class="small-btn" id="wq-change-patient-btn">Change patient</button>
+      <button type="button" class="primary" id="wq-checkin-btn">Add to queue</button>
+    </div>
+
+    <form id="wq-new-patient-form" hidden novalidate>
+      <div class="field">
+        <label for="wq-first-name">First name</label>
+        <input type="text" id="wq-first-name">
+        <div class="error-text" id="wq-first-name-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="wq-surname">Surname</label>
+        <input type="text" id="wq-surname">
+        <div class="error-text" id="wq-surname-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="wq-email">Email</label>
+        <input type="text" id="wq-email" autocomplete="email">
+        <div class="error-text" id="wq-email-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="wq-mobile">Mobile number</label>
+        <input type="text" id="wq-mobile" autocomplete="tel">
+        <div class="error-text" id="wq-mobile-error" hidden></div>
+      </div>
+      <button type="submit" class="primary">Use these details</button>
+    </form>
+
+    <button type="button" class="back-btn" id="wq-patient-back">Back to Today's Schedule</button>
+  </section>
+
+  <!-- WALK-IN ADDED -->
+  <section id="screen-wq-done" hidden>
+    <h2 id="wq-done-heading" tabindex="-1">Added to queue</h2>
+    <p class="instruction" id="wq-done-text"></p>
+    <p style="word-break:break-all;font-family:monospace;font-size:14px;" id="wq-done-link"></p>
+    <button type="button" class="primary" id="wq-another-btn">Add another walk-in</button>
+    <button type="button" class="back-btn" id="wq-done-back">Back to Today's Schedule</button>
+  </section>
+
+  <!-- QUEUE -->
+  <section id="screen-queue" hidden>
+    <h2 id="queue-heading" tabindex="-1">Queue</h2>
+
+    <h3>Being seen</h3>
+    <div id="queue-with-practitioner"></div>
+
+    <h3>Called</h3>
+    <div id="queue-called"></div>
+
+    <h3>Waiting</h3>
+    <div id="queue-waiting"></div>
+
+    <h3>Stepped away</h3>
+    <div id="queue-stepped-away"></div>
+
+    <div id="queue-override-area"></div>
+  </section>
+
+  <!-- PRACTITIONER SCHEDULE -->
+  <section id="screen-ps" hidden>
+    <h2 id="ps-heading" tabindex="-1">Practitioner Schedule</h2>
+    <div class="field">
+      <label for="ps-select">Choose a practitioner</label>
+      <select id="ps-select"></select>
+    </div>
+    <div id="ps-results"></div>
+  </section>
+
+  <!-- PRACTICE LOCATIONS -->
+  <section id="screen-locations" hidden>
+    <h2 id="loc-heading" tabindex="-1">Practice Locations</h2>
+    <div id="loc-list"></div>
+  </section>
+
+  <!-- UPCOMING APPOINTMENTS -->
+  <section id="screen-upcoming" hidden>
+    <h2 id="upcoming-heading" tabindex="-1">Upcoming Appointments</h2>
+    <p class="instruction">Everything booked from tomorrow onward.</p>
+    <div id="upcoming-results"></div>
+  </section>
+
+  <!-- END OF DAY -->
+  <section id="screen-eod" hidden>
+    <h2 id="eod-heading" tabindex="-1">End of Day</h2>
+    <p class="instruction" id="eod-date"></p>
+    <div class="stat-grid" id="eod-stats"></div>
+    <h3>Tomorrow's schedule</h3>
+    <div id="eod-tomorrow"></div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="screen-search" hidden>
+    <h2 id="search-heading" tabindex="-1">Patient Search</h2>
+    <p class="instruction">Search by name or mobile number.</p>
+    <div class="field">
+      <label for="search-input" class="visually-hidden">Search by name or mobile number</label>
+      <input type="search" id="search-input" placeholder="Start typing a name or number...">
+    </div>
+    <div id="search-results"></div>
+  </section>
+
+  <!-- APPOINTMENT DETAIL -->
+  <section id="screen-detail" hidden>
+    <h2 id="detail-heading" tabindex="-1"></h2>
+    <dl class="detail-list" id="detail-box"></dl>
+
+    <div class="action-row" id="action-row"></div>
+    <div id="confirm-area"></div>
+
+    <h3>Timeline</h3>
+    <ul class="timeline" id="timeline-list"></ul>
+    <button type="button" class="back-btn" id="detail-back">Back to Today's Schedule</button>
+  </section>
+
+  <!-- RESCHEDULE -->
+  <section id="screen-reschedule" hidden>
+    <h2 id="reschedule-heading" tabindex="-1">Choose a new time</h2>
+    <p class="instruction" id="reschedule-instruction"></p>
+    <ul class="appt-list" id="reschedule-slot-list"></ul>
+    <button type="button" class="small-btn" id="reschedule-load-more-btn" hidden>Load more dates</button>
+    <button type="button" class="back-btn" id="reschedule-back-btn">Back to appointment</button>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const QUEUE_STATUS_BASE_URL = 'https://atlas-queue-status-1.vercel.app';
+const BACKEND_BASE_URL = 'https://atlas-backend-test-five.vercel.app';
+
+const $ = (sel) => document.querySelector(sel);
+const live = $('#live-region');
+let staffPracticeId = null;
+let staffLocationId = null;
+let staffLocationName = null;
+let showAllToday = false;
+let todaysAppointments = [];
+
+function announce(msg){
+  live.textContent = '';
+  setTimeout(() => {
+    live.textContent = msg;
+    setTimeout(() => { live.textContent = ''; }, 4000);
+  }, 30);
+}
+function showError(msg){
+  $('#error-area').innerHTML = '<div class="error-banner">' + msg + '</div>';
+  announce(msg);
+}
+function clearError(){ $('#error-area').innerHTML = ''; }
+
+function formatDateISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+function formatDateLabel(d){
+  return d.toLocaleDateString('en-ZA', { weekday:'long', day:'2-digit', month:'long' });
+}
+function statusLabel(s){
+  const labels = { booked:'Booked', arrived:'Arrived', 'with-practitioner':'With Practitioner', completed:'Completed', cancelled:'Cancelled', 'no-show':'No Show' };
+  return labels[s] || s;
+}
+function formatTime(t){ return t.slice(0,5); }
+
+const SLOT_MINUTES = 30;
+function generateSlots(startTime, endTime, dateObj, isToday, durationMinutes){
+  const duration = durationMinutes || SLOT_MINUTES;
+  const slots = [];
+  let [h, m] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  const now = new Date();
+  while(h < endH || (h === endH && m < endM)){
+    if(!isToday || h > now.getHours() || (h === now.getHours() && m > now.getMinutes())){
+      slots.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+    }
+    m += duration;
+    if(m >= 60){ m -= 60; h += 1; }
+  }
+  return slots;
+}
+
+const NAV_VISIBLE_SCREENS = ['screen-today', 'screen-search', 'screen-ps', 'screen-locations', 'screen-upcoming', 'screen-eod', 'screen-queue'];
+
+function showScreen(id){
+  document.querySelectorAll('main > section').forEach(s => s.hidden = true);
+  const el = document.getElementById(id);
+  el.hidden = false;
+  clearError();
+  $('#main-nav').hidden = !NAV_VISIBLE_SCREENS.includes(id);
+  const heading = el.querySelector('h2');
+  if(heading){ heading.setAttribute('tabindex','-1'); heading.focus(); }
+}
+
+$('#today-nav-btn').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+
+async function checkExistingSession(){
+  const { data: { session } } = await db.auth.getSession();
+  if(session) await handleLoggedIn(session.user);
+}
+
+async function handleLoggedIn(user){
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, role, is_active, practice_id, location_id')
+    .eq('user_id', user.id).eq('role', 'receptionist').maybeSingle();
+
+  if(roleErr || !roleRow){
+    showError('We could not find a receptionist account linked to this login. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+  if(!roleRow.is_active){
+    showError('Your account is inactive. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+
+  staffPracticeId = roleRow.practice_id;
+  staffLocationId = roleRow.location_id;
+  staffLocationName = null;
+  if(staffLocationId){
+    const { data: locRow } = await db.from('locations').select('name').eq('id', staffLocationId).single();
+    if(locRow) staffLocationName = locRow.name;
+  }
+  $('#brand-eyebrow').textContent = 'Atlas — ' + roleRow.role.charAt(0).toUpperCase() + roleRow.role.slice(1);
+  $('#page-title').textContent = 'Hi, ' + roleRow.full_name.split(' ')[0];
+  $('#logout-btn').hidden = false;
+
+  showScreen('screen-today');
+  await loadToday();
+}
+
+async function loadToday(){
+  clearError();
+  const today = new Date();
+  $('#today-heading').textContent = staffLocationName ? ('Today\'s Schedule — ' + staffLocationName) : 'Today\'s Schedule — All Locations';
+  $('#today-date').textContent = formatDateLabel(today);
+  $('#appt-list').innerHTML = '<li class="loading-text">Loading today\'s schedule...</li>';
+  const todayStr = formatDateISO(today);
+
+  let query = db
+    .from('appointments')
+    .select('id, appointment_time, status, reason, patients(first_name, surname, email, mobile_number), practitioners(name), locations(name)')
+    .eq('practice_id', staffPracticeId)
+    .eq('appointment_date', todayStr);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query.order('appointment_time', { ascending: true });
+
+  if(error){
+    showError('We could not load today\'s schedule right now. Technical detail: ' + error.message);
+    $('#appt-list').innerHTML = '';
+    return;
+  }
+
+  todaysAppointments = data || [];
+  renderToday();
+}
+
+function renderToday(){
+  const active = todaysAppointments.filter(a => a.status !== 'cancelled');
+  const cancelled = todaysAppointments.filter(a => a.status === 'cancelled');
+  $('#summary-line').textContent = active.length + ' appointment' + (active.length === 1 ? '' : 's') + ' today, ' + cancelled.length + ' cancelled.';
+
+  const finishedStatuses = ['completed','cancelled','no-show'];
+  const visible = showAllToday
+    ? todaysAppointments
+    : todaysAppointments.filter(a => !finishedStatuses.includes(a.status));
+  const finishedCount = todaysAppointments.filter(a => finishedStatuses.includes(a.status)).length;
+
+  $('#show-all-toggle').textContent = showAllToday
+    ? 'Show active only'
+    : 'Show all' + (finishedCount > 0 ? ' (' + finishedCount + ' no longer active)' : '');
+
+  const list = $('#appt-list');
+  list.innerHTML = '';
+  if(visible.length === 0){
+    const li = document.createElement('li');
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = showAllToday ? 'No appointments booked for today.' : 'No active appointments right now. Tap "Show all" to see completed or cancelled ones.';
+    li.appendChild(p); list.appendChild(li);
+    return;
+  }
+  visible.forEach(a => {
+    const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+    const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+    const locationName = a.locations ? a.locations.name : '';
+    const time = formatTime(a.appointment_time);
+    const li = document.createElement('li');
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'appt-card';
+    card.innerHTML =
+      '<span class="time">' + time + '</span> — ' +
+      '<span class="who">' + patientName + ', with ' + practitionerName + '</span>' +
+      '<span class="loc">' + locationName + '</span>' +
+      '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    card.addEventListener('click', () => openDetail(a.id, 'today'));
+    li.appendChild(card);
+    list.appendChild(li);
+  });
+}
+
+let currentApptId = null;
+let detailReturnScreen = 'today';
+
+async function openDetail(apptId, returnScreen){
+  currentApptId = apptId;
+  detailReturnScreen = returnScreen || 'today';
+  showScreen('screen-detail');
+  await renderDetail();
+}
+
+async function renderDetail(){
+  const backLabels = { today: "Back to Today's Schedule", ps: 'Back to Practitioner Schedule', search: 'Back to Search', upcoming: 'Back to Upcoming Appointments', eod: 'Back to End of Day' };
+  $('#detail-back').textContent = backLabels[detailReturnScreen] || "Back to Today's Schedule";
+  const { data: a, error } = await db
+    .from('appointments')
+    .select('id, appointment_date, appointment_time, status, reason, practitioner_id, location_id, patient_id, patients(first_name, surname, email, mobile_number), practitioners(name, appointment_duration_minutes), locations(name)')
+    .eq('id', currentApptId).single();
+
+  if(error || !a){
+    showError('We could not load this appointment right now.' + (error ? ' Technical detail: ' + error.message : ''));
+    return;
+  }
+
+  const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+  const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+  const locationName = a.locations ? a.locations.name : '';
+  const time = formatTime(a.appointment_time);
+
+  $('#detail-heading').textContent = patientName + ' — ' + time;
+
+  const dl = $('#detail-box');
+  dl.innerHTML = '';
+  const rows = [
+    ['Patient name', patientName],
+    ['Practitioner', practitionerName],
+    ['Location', locationName],
+    ['Date', a.appointment_date],
+    ['Time', time],
+    ['Email', a.patients ? (a.patients.email || '—') : '—'],
+    ['Mobile number', a.patients ? (a.patients.mobile_number || '—') : '—'],
+    ['Status', statusLabel(a.status)]
+  ];
+  if(a.reason) rows.splice(6, 0, ['Reason for visit', a.reason]);
+  rows.forEach(([t,d]) => {
+    const dt = document.createElement('dt'); dt.textContent = t;
+    const dd = document.createElement('dd'); dd.textContent = d;
+    dl.appendChild(dt); dl.appendChild(dd);
+  });
+
+  const row = $('#action-row');
+  row.innerHTML = '';
+  const addAction = (label, fn, danger) => {
+    const btn = document.createElement('button');
+    if(danger) btn.className = 'danger';
+    btn.type = 'button'; btn.textContent = label;
+    btn.addEventListener('click', fn);
+    row.appendChild(btn);
+  };
+  if(a.status === 'booked'){ addAction('Mark as arrived', () => updateStatus('arrived', 'Marked as arrived')); }
+  if(a.status === 'booked'){ addAction('Check in to queue', () => checkInToQueue(a)); }
+  if(a.status === 'booked'){ addAction('Mark as no show', () => confirmNoShow(patientName), true); }
+  if(a.status === 'arrived'){ addAction('Mark as with practitioner', () => updateStatus('with-practitioner', 'Marked as with practitioner')); }
+  if(a.status === 'with-practitioner'){ addAction('Mark as completed', () => updateStatus('completed', 'Marked as completed')); }
+  if(a.status === 'booked' || a.status === 'arrived'){
+    addAction('Reschedule', () => openReschedule(a));
+    addAction('Cancel appointment', () => confirmCancel(patientName, a), true);
+  }
+
+  $('#confirm-area').innerHTML = '';
+  await renderTimeline();
+}
+
+async function updateStatus(newStatus, eventText){
+  clearError();
+  const { error: updateErr } = await db
+    .from('appointments').update({ status: newStatus }).eq('id', currentApptId);
+  if(updateErr){
+    showError('We could not update this appointment right now. Technical detail: ' + updateErr.message);
+    return;
+  }
+  await db.from('appointment_timeline').insert({ appointment_id: currentApptId, event_text: eventText });
+  await renderDetail();
+  announce(eventText + '.');
+}
+
+async function notifyPractitionerOfCancellation(appt, patientName){
+  if(!appt || !appt.practitioner_id){ showError('Notification skipped — no practitioner on this appointment.'); return; }
+  try{
+    const { data: staffRow, error: lookupErr } = await db
+      .from('staff_roles').select('user_id')
+      .eq('practitioner_id', appt.practitioner_id).eq('role', 'practitioner').eq('is_active', true).maybeSingle();
+    if(lookupErr){ showError('Notification lookup failed. Technical detail: ' + lookupErr.message); return; }
+    if(!staffRow){ showError('Notification skipped — no active practitioner login found for this appointment.'); return; }
+
+    const resp = await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        practitionerUserId: staffRow.user_id,
+        title: 'Appointment cancelled',
+        body: patientName + '\'s appointment on ' + appt.appointment_date + ' at ' + formatTime(appt.appointment_time) + ' was just cancelled.'
+      })
+    });
+    const result = await resp.json().catch(() => ({}));
+    showError('Notification attempt result: ' + JSON.stringify(result));
+  } catch(e){ showError('Notification request failed entirely. Technical detail: ' + e.message); }
+}
+
+function confirmCancel(patientName, appt){
+  const area = $('#confirm-area');
+  area.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'confirm-dialog';
+  box.setAttribute('role', 'alertdialog');
+  box.setAttribute('aria-label', 'Confirm cancellation');
+  const p = document.createElement('p');
+  p.textContent = 'Cancel ' + patientName + '\'s appointment?';
+  const rowEl = document.createElement('div'); rowEl.className = 'action-row';
+  const yesBtn = document.createElement('button'); yesBtn.className = 'danger'; yesBtn.type = 'button'; yesBtn.textContent = 'Yes, cancel it';
+  const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.textContent = 'No, keep it';
+  yesBtn.addEventListener('click', async () => {
+    area.innerHTML = '';
+    await updateStatus('cancelled', 'Appointment cancelled');
+    notifyPractitionerOfCancellation(appt, patientName);
+  });
+  noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Kept the appointment as is.'); });
+  rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
+  box.appendChild(p); box.appendChild(rowEl); area.appendChild(box);
+  p.setAttribute('tabindex', '-1'); p.focus();
+}
+
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkInToQueue(a){
+  clearError();
+  const rawToken = crypto.randomUUID().replace(/-/g,'') + crypto.randomUUID().replace(/-/g,'');
+  const tokenHash = await sha256Hex(rawToken);
+  const today = new Date();
+  const expiresAt = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+  const { error } = await db.from('queue_entries').insert({
+    practice_id: staffPracticeId,
+    location_id: a.location_id,
+    practitioner_id: a.practitioner_id,
+    appointment_id: a.id,
+    patient_id: a.patient_id,
+    is_walk_in: false,
+    token_hash: tokenHash,
+    expires_at: expiresAt.toISOString()
+  });
+
+  if(error){
+    if(error.code === '23505'){
+      showError('This patient already has an active queue entry today.');
+    } else {
+      showError('We could not check this patient into the queue right now. Technical detail: ' + error.message);
+    }
+    return;
+  }
+
+  await updateStatus('arrived', 'Checked in to queue');
+  showQueueLink(rawToken);
+}
+
+function showQueueLink(rawToken){
+  const link = QUEUE_STATUS_BASE_URL + '/?token=' + rawToken;
+  const box = document.createElement('div');
+  box.className = 'confirm-dialog';
+  box.innerHTML = '<p>Share this link with the patient so they can see their own queue status:</p><p style="word-break:break-all;font-family:monospace;font-size:14px;">' + link + '</p>';
+  $('#confirm-area').appendChild(box);
+  announce('A queue status link has been created for this patient.');
+}
+
+function confirmNoShow(patientName){
+  const area = $('#confirm-area');
+  area.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'confirm-dialog';
+  box.setAttribute('role', 'alertdialog');
+  box.setAttribute('aria-label', 'Confirm no show');
+  const p = document.createElement('p');
+  p.textContent = 'Mark ' + patientName + ' as a no show?';
+  const rowEl = document.createElement('div'); rowEl.className = 'action-row';
+  const yesBtn = document.createElement('button'); yesBtn.className = 'danger'; yesBtn.type = 'button'; yesBtn.textContent = 'Yes, mark as no show';
+  const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.textContent = 'No, keep as booked';
+  yesBtn.addEventListener('click', () => { area.innerHTML = ''; updateStatus('no-show', 'Marked as no show'); });
+  noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Kept the appointment as is.'); });
+  rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
+  box.appendChild(p); box.appendChild(rowEl); area.appendChild(box);
+  p.setAttribute('tabindex', '-1'); p.focus();
+}
+
+async function renderTimeline(){
+  const { data, error } = await db
+    .from('appointment_timeline').select('event_text, created_at')
+    .eq('appointment_id', currentApptId).order('created_at', { ascending: true });
+  const list = $('#timeline-list');
+  list.innerHTML = '';
+  if(error){ return; }
+  (data || []).forEach(entry => {
+    const li = document.createElement('li');
+    const timeLabel = new Date(entry.created_at).toLocaleString('en-ZA', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    li.innerHTML = '<span class="event-time">' + timeLabel + '</span>' + entry.event_text;
+    list.appendChild(li);
+  });
+}
+
+$('#detail-back').addEventListener('click', async () => {
+  if(detailReturnScreen === 'ps'){
+    showScreen('screen-ps');
+    await renderPsResults($('#ps-select').value);
+  } else if(detailReturnScreen === 'search'){
+    showScreen('screen-search');
+  } else if(detailReturnScreen === 'upcoming'){
+    showScreen('screen-upcoming');
+    await renderUpcoming();
+  } else if(detailReturnScreen === 'eod'){
+    await renderEndOfDay();
+  } else {
+    showScreen('screen-today');
+    await loadToday();
+  }
+});
+
+let searchDebounce = null;
+
+$('#search-nav-btn').addEventListener('click', () => {
+  $('#search-input').value = '';
+  $('#search-results').innerHTML = '';
+  showScreen('screen-search');
+});
+
+$('#search-input').addEventListener('input', (e) => {
+  clearTimeout(searchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#search-results').innerHTML = ''; return; }
+  searchDebounce = setTimeout(() => runSearch(q), 300);
+});
+
+async function runSearch(q){
+  const results = $('#search-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+
+  const { data: patients, error: patientErr } = await db
+    .from('patients')
+    .select('id, first_name, surname, mobile_number')
+    .eq('practice_id', staffPracticeId)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(20);
+
+  if(patientErr){
+    results.innerHTML = '';
+    showError('We could not search right now. Technical detail: ' + patientErr.message);
+    return;
+  }
+  if(!patients || patients.length === 0){
+    results.innerHTML = '';
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No patients found matching "' + q + '".';
+    results.appendChild(p);
+    announce('No results found.');
+    return;
+  }
+
+  const todayStr = formatDateISO(new Date());
+  const patientIds = patients.map(p => p.id);
+  const { data: appts, error: apptErr } = await db
+    .from('appointments')
+    .select('id, appointment_date, appointment_time, status, patient_id, location_id, practitioners(name), locations(name)')
+    .in('patient_id', patientIds)
+    .gte('appointment_date', todayStr)
+    .not('status', 'in', '(cancelled,no-show)')
+    .order('appointment_date', { ascending: true });
+
+  if(apptErr){
+    results.innerHTML = '';
+    showError('We could not load appointments right now. Technical detail: ' + apptErr.message);
+    return;
+  }
+
+  results.innerHTML = '';
+  patients.forEach(p => {
+    const box = document.createElement('div');
+    box.className = 'search-result';
+    const nameEl = document.createElement('span'); nameEl.className = 'patient-name';
+    nameEl.textContent = p.first_name + ' ' + p.surname;
+    const contactEl = document.createElement('span'); contactEl.className = 'patient-contact';
+    contactEl.textContent = p.mobile_number || '—';
+    box.appendChild(nameEl); box.appendChild(contactEl);
+
+    const own = (appts || []).filter(a => a.patient_id === p.id);
+    if(own.length === 0){
+      const noneEl = document.createElement('p'); noneEl.className = 'no-appts';
+      noneEl.style.margin = '0'; noneEl.textContent = 'No upcoming appointments.';
+      box.appendChild(noneEl);
+    } else {
+      const ul = document.createElement('ul');
+      own.forEach(a => {
+        const li = document.createElement('li');
+        const infoEl = document.createElement('span'); infoEl.className = 'appt-info';
+        const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+        const locationName = a.locations ? a.locations.name : '';
+        infoEl.textContent = a.appointment_date + ', ' + formatTime(a.appointment_time) + ' — ' + practitionerName + ' (' + locationName + ')';
+        li.appendChild(infoEl);
+
+        const isOwnLocation = !staffLocationId || a.location_id === staffLocationId;
+        if(isOwnLocation){
+          const btn = document.createElement('button'); btn.className = 'small-btn'; btn.type = 'button'; btn.textContent = 'View';
+          btn.addEventListener('click', () => openDetail(a.id, 'search'));
+          li.appendChild(btn);
+        } else {
+          const note = document.createElement('span'); note.className = 'other-location-note';
+          note.textContent = 'At another location';
+          li.appendChild(note);
+        }
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
+    results.appendChild(box);
+  });
+  announce(patients.length + ' patient' + (patients.length === 1 ? '' : 's') + ' found.');
+}
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if(!email || !password){
+    showError('Please enter both your email and password.');
+    return;
+  }
+  const btn = $('#login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false; btn.textContent = 'Sign in';
+
+  if(error){
+    showError("We couldn't sign you in. Please check your email and password and try again.");
+    return;
+  }
+  await handleLoggedIn(data.user);
+});
+
+$('#forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  showError("Forgot password isn't connected yet — please contact your practice administrator for now.");
+});
+
+$('#show-all-toggle').addEventListener('click', () => {
+  showAllToday = !showAllToday;
+  $('#show-all-toggle').setAttribute('aria-pressed', String(showAllToday));
+  renderToday();
+});
+
+$('#logout-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  staffPracticeId = null;
+  staffLocationId = null;
+  staffLocationName = null;
+  $('#logout-btn').hidden = true;
+  $('#brand-eyebrow').textContent = 'Atlas — Receptionist';
+  $('#page-title').textContent = 'Sign In';
+  $('#login-form').reset();
+  clearError();
+  showScreen('screen-login');
+  announce('You have been signed out.');
+});
+
+let bookState = {};
+
+$('#book-nav-btn').addEventListener('click', () => { bookState = {}; openBookFlow(); });
+$('#book-practitioner-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#book-slot-back').addEventListener('click', () => { showScreen('screen-book-practitioner'); });
+$('#book-patient-back').addEventListener('click', () => { showScreen('screen-book-slot'); });
+$('#book-confirm-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#book-another-btn').addEventListener('click', () => { bookState = {}; openBookFlow(); });
+
+async function openBookFlow(){
+  showScreen('screen-book-practitioner');
+  const list = $('#book-practitioner-list');
+  list.innerHTML = '<li class="loading-text">Loading practitioners...</li>';
+
+  let query = db.from('practitioners').select('id, name, role, appointment_duration_minutes')
+    .eq('practice_id', staffPracticeId).eq('is_active', true).eq('is_available', true);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){ showError('We could not load practitioners right now. Technical detail: ' + error.message); list.innerHTML = ''; return; }
+
+  list.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No practitioners are available to book right now.';
+    list.appendChild(p);
+    return;
+  }
+  data.forEach(pr => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+    btn.innerHTML = '<span class="who">' + pr.name + ' — ' + pr.role + '</span>';
+    btn.addEventListener('click', () => { bookState.practitioner = pr; loadBookSlots(); });
+    li.appendChild(btn); list.appendChild(li);
+  });
+}
+
+const BOOK_SLOT_WINDOW_STEP_DAYS = 21;
+
+async function loadBookSlots(){
+  bookState.slotWindowDays = BOOK_SLOT_WINDOW_STEP_DAYS;
+  showScreen('screen-book-slot');
+  $('#book-slot-heading').textContent = 'Choose a time — ' + bookState.practitioner.name;
+  $('#book-slot-list').innerHTML = '<li class="loading-text">Loading times...</li>';
+  await renderBookSlots();
+}
+
+async function renderBookSlots(){
+  const list = $('#book-slot-list');
+
+  const { data: availRows, error: availErr } = await db
+    .from('practitioner_availability').select('day_of_week, start_time, end_time')
+    .eq('practitioner_id', bookState.practitioner.id);
+  if(availErr){ showError('We could not load availability right now. Technical detail: ' + availErr.message); list.innerHTML = ''; return; }
+
+  const patternsByDay = {};
+  (availRows || []).forEach(a => { if(!patternsByDay[a.day_of_week]) patternsByDay[a.day_of_week] = []; patternsByDay[a.day_of_week].push(a); });
+
+  const today = new Date();
+  const rangeStart = formatDateISO(today);
+  const rangeEndDate = new Date(today); rangeEndDate.setDate(rangeEndDate.getDate() + bookState.slotWindowDays);
+  const rangeEnd = formatDateISO(rangeEndDate);
+
+  const { data: bookedRows, error: bookedErr } = await db
+    .from('appointments').select('appointment_date, appointment_time')
+    .eq('practitioner_id', bookState.practitioner.id)
+    .gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd)
+    .not('status', 'in', '(cancelled,no-show)');
+  if(bookedErr){ showError('We could not check availability right now. Technical detail: ' + bookedErr.message); list.innerHTML = ''; return; }
+
+  const bookedSet = new Set((bookedRows || []).map(b => b.appointment_date + '_' + b.appointment_time.slice(0,5)));
+
+  const slots = [];
+  for(let i = 0; i < bookState.slotWindowDays; i++){
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const patterns = patternsByDay[d.getDay()];
+    if(!patterns) continue;
+    const dateStr = formatDateISO(d);
+    const isToday = i === 0;
+    patterns.forEach(p => {
+      generateSlots(p.start_time, p.end_time, d, isToday, bookState.practitioner.appointment_duration_minutes).forEach(t => {
+        if(!bookedSet.has(dateStr + '_' + t)) slots.push({ dateStr, dateLabel: formatDateLabel(d), time: t });
+      });
+    });
+  }
+
+  list.innerHTML = '';
+  if(slots.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No upcoming openings found for this practitioner.';
+    list.appendChild(p);
+  } else {
+    slots.forEach(s => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+      btn.innerHTML = '<span class="who">' + s.dateLabel + ', ' + s.time + '</span>';
+      btn.addEventListener('click', () => { bookState.dateStr = s.dateStr; bookState.dateLabel = s.dateLabel; bookState.time = s.time; openBookPatientStep(); });
+      li.appendChild(btn); list.appendChild(li);
+    });
+  }
+
+  $('#book-load-more-btn').hidden = bookState.slotWindowDays >= 90;
+}
+
+$('#book-load-more-btn').addEventListener('click', async () => {
+  bookState.slotWindowDays = Math.min(bookState.slotWindowDays + BOOK_SLOT_WINDOW_STEP_DAYS, 90);
+  announce('Loading more dates...');
+  await renderBookSlots();
+  announce('More dates loaded.');
+});
+
+function openBookPatientStep(){
+  showScreen('screen-book-patient');
+  $('#book-patient-subheading').textContent = bookState.practitioner.name + ', ' + bookState.dateLabel + ', ' + bookState.time;
+  $('#book-patient-search').value = '';
+  $('#book-patient-results').innerHTML = '';
+  $('#book-patient-search-area').hidden = false;
+  $('#book-selected-patient').hidden = true;
+  $('#book-new-patient-form').hidden = true;
+  $('#book-reason-area').hidden = true;
+  $('#book-reason').value = '';
+  bookState.patient = null;
+}
+
+let bookSearchDebounce = null;
+$('#book-patient-search').addEventListener('input', (e) => {
+  clearTimeout(bookSearchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#book-patient-results').innerHTML = ''; return; }
+  bookSearchDebounce = setTimeout(() => runBookPatientSearch(q), 300);
+});
+
+async function runBookPatientSearch(q){
+  const results = $('#book-patient-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+  const { data, error } = await db
+    .from('patients').select('id, first_name, surname, mobile_number, email')
+    .eq('practice_id', staffPracticeId)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(10);
+  if(error){ results.innerHTML = ''; showError('We could not search right now. Technical detail: ' + error.message); return; }
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No matching patients. You can add them as a new patient instead.';
+    results.appendChild(p);
+    return;
+  }
+  data.forEach(p => {
+    const box = document.createElement('div'); box.className = 'search-result';
+    const nameEl = document.createElement('span'); nameEl.className = 'patient-name'; nameEl.textContent = p.first_name + ' ' + p.surname;
+    const contactEl = document.createElement('span'); contactEl.className = 'patient-contact'; contactEl.textContent = p.mobile_number || p.email || '—';
+    const btn = document.createElement('button'); btn.className = 'small-btn'; btn.type = 'button'; btn.textContent = 'Select';
+    btn.addEventListener('click', () => selectExistingPatient(p));
+    box.appendChild(nameEl); box.appendChild(contactEl); box.appendChild(btn);
+    results.appendChild(box);
+  });
+}
+
+function selectExistingPatient(p){
+  bookState.patient = { id: p.id, name: p.first_name + ' ' + p.surname };
+  $('#book-patient-search-area').hidden = true;
+  $('#book-selected-patient').hidden = false;
+  $('#book-selected-summary').textContent = 'Selected: ' + bookState.patient.name;
+  $('#book-reason-area').hidden = false;
+}
+
+$('#book-change-patient-btn').addEventListener('click', () => { openBookPatientStep(); });
+
+$('#book-new-patient-btn').addEventListener('click', () => {
+  $('#book-patient-search-area').hidden = true;
+  $('#book-new-patient-form').hidden = false;
+  $('#book-first-name').focus();
+});
+
+$('#book-new-patient-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  let hasError = false, firstErrorField = null;
+  const checks = [
+    { id:'book-first-name', label:'first name' }, { id:'book-surname', label:'surname' },
+    { id:'book-email', label:'email' }, { id:'book-mobile', label:'mobile number' }
+  ];
+  checks.forEach(c => {
+    const input = $('#' + c.id); const errorEl = $('#' + c.id + '-error');
+    if(!input.value.trim()){ errorEl.textContent = 'Please add the patient\'s ' + c.label + '.'; errorEl.hidden = false; hasError = true; if(!firstErrorField) firstErrorField = input; }
+    else { errorEl.hidden = true; }
+  });
+  if(hasError){ announce('Please fill in the missing patient details.'); firstErrorField.focus(); return; }
+
+  bookState.patient = {
+    id: null,
+    firstName: $('#book-first-name').value.trim(), surname: $('#book-surname').value.trim(),
+    email: $('#book-email').value.trim(), mobile: $('#book-mobile').value.trim()
+  };
+  bookState.patient.name = bookState.patient.firstName + ' ' + bookState.patient.surname;
+  $('#book-new-patient-form').hidden = true;
+  $('#book-selected-patient').hidden = false;
+  $('#book-selected-summary').textContent = 'New patient: ' + bookState.patient.name;
+  $('#book-reason-area').hidden = false;
+});
+
+$('#book-confirm-btn').addEventListener('click', async () => {
+  clearError();
+  const btn = $('#book-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Booking...';
+  const reason = $('#book-reason').value.trim();
+
+  let patientId = bookState.patient.id;
+  if(!patientId){
+    const { data: newPatient, error: patientErr } = await db
+      .from('patients').insert({
+        practice_id: staffPracticeId, first_name: bookState.patient.firstName, surname: bookState.patient.surname,
+        email: bookState.patient.email, mobile_number: bookState.patient.mobile
+      }).select('id').single();
+    if(patientErr){
+      showError('We could not save the patient\'s details right now. Technical detail: ' + patientErr.message);
+      btn.disabled = false; btn.textContent = 'Confirm booking';
+      return;
+    }
+    patientId = newPatient.id;
+  }
+
+  const { data: appt, error: apptErr } = await db
+    .from('appointments').insert({
+      practice_id: staffPracticeId, location_id: staffLocationId, practitioner_id: bookState.practitioner.id,
+      patient_id: patientId, appointment_date: bookState.dateStr, appointment_time: bookState.time,
+      status: 'booked', reason: reason || null
+    }).select('id').single();
+
+  btn.disabled = false; btn.textContent = 'Confirm booking';
+
+  if(apptErr){
+    if(apptErr.code === '23505'){
+      showError('That time was just taken. Please choose a different time.');
+      loadBookSlots();
+    } else {
+      showError('We could not save this booking right now. Technical detail: ' + apptErr.message);
+    }
+    return;
+  }
+
+  await db.from('appointment_timeline').insert({ appointment_id: appt.id, event_text: 'Booked by reception' });
+
+  showScreen('screen-book-confirm');
+  const text = bookState.patient.name + ' — ' + bookState.practitioner.name + ', ' + bookState.dateLabel + ' at ' + bookState.time + '.';
+  $('#book-confirm-text').textContent = text;
+  announce('Booking confirmed. ' + text);
+});
+
+let emState = {};
+
+$('#emergency-nav-btn').addEventListener('click', () => { emState = {}; openEmergencyFlow(); });
+$('#em-practitioner-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#em-details-back').addEventListener('click', () => { showScreen('screen-em-practitioner'); });
+$('#em-done-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#em-another-btn').addEventListener('click', () => { emState = {}; openEmergencyFlow(); });
+
+async function openEmergencyFlow(){
+  showScreen('screen-em-practitioner');
+  const list = $('#em-practitioner-list');
+  list.innerHTML = '<li class="loading-text">Loading practitioners...</li>';
+
+  let query = db.from('practitioners').select('id, name, role')
+    .eq('practice_id', staffPracticeId).eq('is_active', true).eq('is_available', true);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){ showError('We could not load practitioners right now. Technical detail: ' + error.message); list.innerHTML = ''; return; }
+
+  let workingToday = [];
+  if(data && data.length > 0){
+    const todayDow = new Date().getDay();
+    const ids = data.map(p => p.id);
+    const { data: availRows, error: availErr } = await db
+      .from('practitioner_availability').select('practitioner_id')
+      .in('practitioner_id', ids).eq('day_of_week', todayDow);
+    if(availErr){ showError('We could not check today\'s availability right now. Technical detail: ' + availErr.message); list.innerHTML = ''; return; }
+    const workingIds = new Set((availRows || []).map(a => a.practitioner_id));
+    workingToday = data.filter(p => workingIds.has(p.id));
+  }
+
+  list.innerHTML = '';
+  if(workingToday.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No practitioners are scheduled to work today.';
+    list.appendChild(p);
+    return;
+  }
+  workingToday.forEach(pr => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+    btn.innerHTML = '<span class="who">' + pr.name + ' — ' + pr.role + '</span>';
+    btn.addEventListener('click', () => { emState.practitioner = pr; openEmergencyDetails(); });
+    li.appendChild(btn); list.appendChild(li);
+  });
+}
+
+async function openEmergencyDetails(){
+  showScreen('screen-em-details');
+  $('#em-details-heading').textContent = 'Fit in a patient — ' + emState.practitioner.name;
+
+  const todayStr = formatDateISO(new Date());
+  const { data: todays, error } = await db
+    .from('appointments').select('appointment_time, status, patients(first_name, surname)')
+    .eq('practitioner_id', emState.practitioner.id).eq('appointment_date', todayStr)
+    .not('status', 'in', '(cancelled,no-show)')
+    .order('appointment_time', { ascending: true });
+
+  const list = $('#em-existing-list');
+  list.innerHTML = '';
+  if(error){
+    showError('We could not load today\'s schedule right now. Technical detail: ' + error.message);
+  } else if(!todays || todays.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'No appointments booked yet today.';
+    list.appendChild(p);
+  } else {
+    emState.todaysForPractitioner = todays;
+    todays.forEach(a => {
+      const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+      const li = document.createElement('li');
+      const card = document.createElement('div'); card.className = 'appt-card';
+      card.innerHTML = '<span class="time">' + formatTime(a.appointment_time) + '</span> — <span class="who">' + patientName + '</span><span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+      li.appendChild(card); list.appendChild(li);
+    });
+  }
+
+  $('#em-patient-search').value = '';
+  $('#em-patient-results').innerHTML = '';
+  $('#em-patient-search-area').hidden = false;
+  $('#em-selected-patient').hidden = true;
+  $('#em-new-patient-form').hidden = true;
+  $('#em-time-reason-area').hidden = true;
+  $('#em-time').value = ''; $('#em-reason').value = '';
+  $('#em-confirm-area').innerHTML = '';
+  emState.patient = null;
+}
+
+let emSearchDebounce = null;
+$('#em-patient-search').addEventListener('input', (e) => {
+  clearTimeout(emSearchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#em-patient-results').innerHTML = ''; return; }
+  emSearchDebounce = setTimeout(() => runEmPatientSearch(q), 300);
+});
+
+async function runEmPatientSearch(q){
+  const results = $('#em-patient-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+  const { data, error } = await db
+    .from('patients').select('id, first_name, surname, mobile_number, email')
+    .eq('practice_id', staffPracticeId)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(10);
+  if(error){ results.innerHTML = ''; showError('We could not search right now. Technical detail: ' + error.message); return; }
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No matching patients. You can add them as a new patient instead.';
+    results.appendChild(p);
+    return;
+  }
+  data.forEach(p => {
+    const box = document.createElement('div'); box.className = 'search-result';
+    const nameEl = document.createElement('span'); nameEl.className = 'patient-name'; nameEl.textContent = p.first_name + ' ' + p.surname;
+    const contactEl = document.createElement('span'); contactEl.className = 'patient-contact'; contactEl.textContent = p.mobile_number || p.email || '—';
+    const btn = document.createElement('button'); btn.className = 'small-btn'; btn.type = 'button'; btn.textContent = 'Select';
+    btn.addEventListener('click', () => selectEmExistingPatient(p));
+    box.appendChild(nameEl); box.appendChild(contactEl); box.appendChild(btn);
+    results.appendChild(box);
+  });
+}
+
+function selectEmExistingPatient(p){
+  emState.patient = { id: p.id, name: p.first_name + ' ' + p.surname };
+  $('#em-patient-search-area').hidden = true;
+  $('#em-selected-patient').hidden = false;
+  $('#em-selected-summary').textContent = 'Selected: ' + emState.patient.name;
+  $('#em-time-reason-area').hidden = false;
+}
+
+$('#em-change-patient-btn').addEventListener('click', () => {
+  $('#em-patient-search-area').hidden = false;
+  $('#em-selected-patient').hidden = true;
+  $('#em-time-reason-area').hidden = true;
+  emState.patient = null;
+});
+
+$('#em-new-patient-btn').addEventListener('click', () => {
+  $('#em-patient-search-area').hidden = true;
+  $('#em-new-patient-form').hidden = false;
+  $('#em-first-name').focus();
+});
+
+$('#em-new-patient-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  let hasError = false, firstErrorField = null;
+  const checks = [
+    { id:'em-first-name', label:'first name' }, { id:'em-surname', label:'surname' },
+    { id:'em-email', label:'email' }, { id:'em-mobile', label:'mobile number' }
+  ];
+  checks.forEach(c => {
+    const input = $('#' + c.id); const errorEl = $('#' + c.id + '-error');
+    if(!input.value.trim()){ errorEl.textContent = 'Please add the patient\'s ' + c.label + '.'; errorEl.hidden = false; hasError = true; if(!firstErrorField) firstErrorField = input; }
+    else { errorEl.hidden = true; }
+  });
+  if(hasError){ announce('Please fill in the missing patient details.'); firstErrorField.focus(); return; }
+
+  emState.patient = {
+    id: null,
+    firstName: $('#em-first-name').value.trim(), surname: $('#em-surname').value.trim(),
+    email: $('#em-email').value.trim(), mobile: $('#em-mobile').value.trim()
+  };
+  emState.patient.name = emState.patient.firstName + ' ' + emState.patient.surname;
+  $('#em-new-patient-form').hidden = true;
+  $('#em-selected-patient').hidden = false;
+  $('#em-selected-summary').textContent = 'New patient: ' + emState.patient.name;
+  $('#em-time-reason-area').hidden = false;
+});
+
+$('#em-confirm-btn').addEventListener('click', () => {
+  $('#em-time-error').hidden = true; $('#em-reason-error').hidden = true;
+  let hasError = false, firstErrorField = null;
+
+  const time = $('#em-time').value.trim();
+  const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if(!time){
+    $('#em-time-error').textContent = 'Please add a time to fit them in.'; $('#em-time-error').hidden = false;
+    hasError = true; firstErrorField = $('#em-time');
+  } else if(!timePattern.test(time)){
+    $('#em-time-error').textContent = 'Please enter a time in HH:MM format, like 14:30.'; $('#em-time-error').hidden = false;
+    hasError = true; if(!firstErrorField) firstErrorField = $('#em-time');
+  } else {
+    const now = new Date();
+    const nowHHMM = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    if(time <= nowHHMM){
+      $('#em-time-error').textContent = 'That time has already passed today. Please choose a time later today.'; $('#em-time-error').hidden = false;
+      hasError = true; if(!firstErrorField) firstErrorField = $('#em-time');
+    }
+  }
+  const reason = $('#em-reason').value.trim();
+  if(!reason){
+    $('#em-reason-error').textContent = 'Please add the reason this needs to happen now.'; $('#em-reason-error').hidden = false;
+    hasError = true; if(!firstErrorField) firstErrorField = $('#em-reason');
+  }
+  if(!emState.patient){
+    showError('Please choose or add a patient before fitting them in.');
+    return;
+  }
+  if(hasError){ announce('Please check the time and reason fields.'); firstErrorField.focus(); return; }
+
+  emState.time = time; emState.reason = reason;
+  const clash = (emState.todaysForPractitioner || []).find(a => formatTime(a.appointment_time) === time);
+
+  const area = $('#em-confirm-area');
+  area.innerHTML = '';
+  const box = document.createElement('div'); box.className = 'confirm-dialog';
+  box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-label', 'Confirm fitting in this patient');
+  const p = document.createElement('p');
+  const clashName = clash && clash.patients ? (clash.patients.first_name + ' ' + clash.patients.surname) : null;
+  p.textContent = clash
+    ? 'This will place ' + emState.patient.name + ' alongside ' + (clashName || 'an existing patient') + '\'s existing ' + time + ' appointment. Are you sure?'
+    : 'Fit ' + emState.patient.name + ' in at ' + time + ', a time with no existing appointment. Are you sure?';
+  const rowEl = document.createElement('div'); rowEl.className = 'action-row';
+  const yesBtn = document.createElement('button'); yesBtn.type = 'button'; yesBtn.textContent = 'Yes, fit them in';
+  const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.textContent = 'No, go back';
+  yesBtn.addEventListener('click', () => { area.innerHTML = ''; performEmergencyBooking(!!clash); });
+  noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Went back without confirming.'); });
+  rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
+  box.appendChild(p); box.appendChild(rowEl); area.appendChild(box);
+  p.setAttribute('tabindex', '-1'); p.focus();
+});
+
+async function performEmergencyBooking(wasClash){
+  clearError();
+  let patientId = emState.patient.id;
+  if(!patientId){
+    const { data: newPatient, error: patientErr } = await db
+      .from('patients').insert({
+        practice_id: staffPracticeId, first_name: emState.patient.firstName, surname: emState.patient.surname,
+        email: emState.patient.email, mobile_number: emState.patient.mobile
+      }).select('id').single();
+    if(patientErr){
+      showError('We could not save the patient\'s details right now. Technical detail: ' + patientErr.message);
+      return;
+    }
+    patientId = newPatient.id;
+  }
+
+  const todayStr = formatDateISO(new Date());
+  const { data: appt, error: apptErr } = await db
+    .from('appointments').insert({
+      practice_id: staffPracticeId, location_id: staffLocationId, practitioner_id: emState.practitioner.id,
+      patient_id: patientId, appointment_date: todayStr, appointment_time: emState.time,
+      status: 'booked', reason: emState.reason, is_emergency: true
+    }).select('id').single();
+
+  if(apptErr){
+    showError('We could not save this booking right now. Technical detail: ' + apptErr.message);
+    return;
+  }
+
+  const timelineNote = wasClash
+    ? 'Fitted in as an emergency/walk-in, alongside an existing appointment. Reason: ' + emState.reason
+    : 'Fitted in as an emergency/walk-in. Reason: ' + emState.reason;
+  await db.from('appointment_timeline').insert({ appointment_id: appt.id, event_text: timelineNote });
+
+  showScreen('screen-em-done');
+  const text = emState.patient.name + ' — ' + emState.practitioner.name + ', today at ' + emState.time + '.';
+  $('#em-done-text').textContent = text;
+  announce('Patient fitted in. ' + text);
+}
+
+$('#ps-nav-btn').addEventListener('click', () => { openPsFlow(); });
+
+async function openPsFlow(){
+  showScreen('screen-ps');
+  const select = $('#ps-select');
+
+  let query = db.from('practitioners').select('id, name, role')
+    .eq('practice_id', staffPracticeId).eq('is_active', true);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){ showError('We could not load practitioners right now. Technical detail: ' + error.message); return; }
+
+  select.innerHTML = '';
+  if(!data || data.length === 0){
+    $('#ps-results').innerHTML = '<p class="no-appts">No practitioners are available right now.</p>';
+    return;
+  }
+  data.forEach(pr => {
+    const opt = document.createElement('option');
+    opt.value = pr.id; opt.textContent = pr.name + ' — ' + pr.role;
+    select.appendChild(opt);
+  });
+  select.onchange = () => renderPsResults(select.value);
+  renderPsResults(select.value);
+}
+
+async function renderPsResults(prId){
+  const results = $('#ps-results');
+  results.innerHTML = '<p class="loading-text">Loading schedule...</p>';
+  const todayStr = formatDateISO(new Date());
+
+  const { data, error } = await db
+    .from('appointments')
+    .select('id, appointment_time, status, patients(first_name, surname)')
+    .eq('practitioner_id', prId).eq('appointment_date', todayStr)
+    .not('status', 'in', '(cancelled,no-show)')
+    .order('appointment_time', { ascending: true });
+
+  if(error){
+    results.innerHTML = '';
+    showError('We could not load this schedule right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  results.innerHTML = '';
+  const h3 = document.createElement('h3'); h3.textContent = "Today's appointments";
+  results.appendChild(h3);
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'No appointments scheduled today.';
+    results.appendChild(p); return;
+  }
+  const list = document.createElement('ul'); list.className = 'appt-list';
+  data.forEach(a => {
+    const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+    const li = document.createElement('li');
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'appt-card';
+    card.innerHTML = '<span class="time">' + formatTime(a.appointment_time) + '</span> — <span class="who">' + patientName + '</span><span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    card.addEventListener('click', () => openDetail(a.id, 'ps'));
+    li.appendChild(card); list.appendChild(li);
+  });
+  results.appendChild(list);
+}
+
+$('#loc-nav-btn').addEventListener('click', () => { openLocationsFlow(); });
+
+async function openLocationsFlow(){
+  showScreen('screen-locations');
+  const wrap = $('#loc-list');
+  wrap.innerHTML = '<p class="loading-text">Loading locations...</p>';
+
+  const { data, error } = await db
+    .from('locations').select('name, address, hours')
+    .eq('practice_id', staffPracticeId).eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if(error){
+    wrap.innerHTML = '';
+    showError('We could not load locations right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  wrap.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'No locations found.';
+    wrap.appendChild(p);
+    return;
+  }
+  data.forEach(loc => {
+    const box = document.createElement('dl'); box.className = 'detail-list';
+    [['Location', loc.name], ['Address', loc.address || '—'], ['Hours', loc.hours || '—']].forEach(([t,d]) => {
+      const dt = document.createElement('dt'); dt.textContent = t;
+      const dd = document.createElement('dd'); dd.textContent = d;
+      box.appendChild(dt); box.appendChild(dd);
+    });
+    wrap.appendChild(box);
+  });
+}
+
+$('#upcoming-nav-btn').addEventListener('click', () => { showScreen('screen-upcoming'); renderUpcoming(); });
+
+async function renderUpcoming(){
+  const results = $('#upcoming-results');
+  results.innerHTML = '<p class="loading-text">Loading upcoming appointments...</p>';
+
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const rangeStart = formatDateISO(tomorrow);
+  const rangeEndDate = new Date(today); rangeEndDate.setDate(rangeEndDate.getDate() + 90);
+  const rangeEnd = formatDateISO(rangeEndDate);
+
+  let query = db
+    .from('appointments')
+    .select('id, appointment_date, appointment_time, status, patients(first_name, surname), practitioners(name)')
+    .eq('practice_id', staffPracticeId)
+    .gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd)
+    .neq('status', 'cancelled');
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query.order('appointment_date', { ascending: true }).order('appointment_time', { ascending: true });
+
+  if(error){
+    results.innerHTML = '';
+    showError('We could not load upcoming appointments right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'No appointments booked beyond today yet.';
+    results.appendChild(p);
+    return;
+  }
+
+  const byDate = {};
+  data.forEach(a => { if(!byDate[a.appointment_date]) byDate[a.appointment_date] = []; byDate[a.appointment_date].push(a); });
+
+  Object.keys(byDate).sort().forEach(dateStr => {
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    const h3 = document.createElement('h3'); h3.textContent = formatDateLabel(dateObj);
+    results.appendChild(h3);
+    const list = document.createElement('ul'); list.className = 'appt-list';
+    byDate[dateStr].forEach(a => {
+      const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+      const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+      const li = document.createElement('li');
+      const card = document.createElement('button'); card.type = 'button'; card.className = 'appt-card';
+      card.innerHTML = '<span class="time">' + formatTime(a.appointment_time) + '</span> — <span class="who">' + patientName + ', with ' + practitionerName + '</span><span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+      card.addEventListener('click', () => openDetail(a.id, 'upcoming'));
+      li.appendChild(card); list.appendChild(li);
+    });
+    results.appendChild(list);
+  });
+}
+
+$('#eod-nav-btn').addEventListener('click', () => { renderEndOfDay(); });
+
+async function renderEndOfDay(){
+  showScreen('screen-eod');
+  const today = new Date();
+  $('#eod-date').textContent = formatDateLabel(today);
+  $('#eod-stats').innerHTML = '<p class="loading-text">Loading today\'s totals...</p>';
+  $('#eod-tomorrow').innerHTML = '';
+
+  const todayStr = formatDateISO(today);
+  let query = db.from('appointments').select('status')
+    .eq('practice_id', staffPracticeId).eq('appointment_date', todayStr);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){
+    $('#eod-stats').innerHTML = '';
+    showError('We could not load today\'s totals right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  const counts = { completed: 0, outstanding: 0, cancelled: 0, noShow: 0 };
+  (data || []).forEach(a => {
+    if(a.status === 'completed') counts.completed++;
+    else if(a.status === 'cancelled') counts.cancelled++;
+    else if(a.status === 'no-show') counts.noShow++;
+    else counts.outstanding++;
+  });
+
+  const statGrid = $('#eod-stats');
+  statGrid.innerHTML = '';
+  [
+    ['Completed', counts.completed], ['Still outstanding', counts.outstanding],
+    ['Cancelled', counts.cancelled], ['No shows', counts.noShow]
+  ].forEach(([label, num]) => {
+    const box = document.createElement('div'); box.className = 'stat-box';
+    box.innerHTML = '<span class="stat-number">' + num + '</span><span class="stat-label">' + label + '</span>';
+    statGrid.appendChild(box);
+  });
+
+  await renderEodTomorrow();
+}
+
+async function renderEodTomorrow(){
+  const wrap = $('#eod-tomorrow');
+  wrap.innerHTML = '<p class="loading-text">Loading tomorrow\'s schedule...</p>';
+
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = formatDateISO(tomorrow);
+
+  let query = db
+    .from('appointments')
+    .select('id, appointment_time, status, patients(first_name, surname), practitioners(name)')
+    .eq('practice_id', staffPracticeId).eq('appointment_date', tomorrowStr)
+    .neq('status', 'cancelled')
+    .order('appointment_time', { ascending: true });
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){
+    wrap.innerHTML = '';
+    showError('We could not load tomorrow\'s schedule right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  wrap.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'Nothing booked for tomorrow yet.';
+    wrap.appendChild(p);
+    return;
+  }
+  const list = document.createElement('ul'); list.className = 'appt-list';
+  data.forEach(a => {
+    const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+    const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+    const li = document.createElement('li');
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'appt-card';
+    card.innerHTML = '<span class="time">' + formatTime(a.appointment_time) + '</span> — <span class="who">' + patientName + ', with ' + practitionerName + '</span><span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    card.addEventListener('click', () => openDetail(a.id, 'eod'));
+    li.appendChild(card); list.appendChild(li);
+  });
+  wrap.appendChild(list);
+}
+
+let rescheduleState = {};
+
+async function openReschedule(a){
+  const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+  rescheduleState = {
+    apptId: a.id,
+    practitionerId: a.practitioner_id,
+    practitionerName: a.practitioners ? a.practitioners.name : 'Unknown practitioner',
+    practitionerDuration: a.practitioners ? a.practitioners.appointment_duration_minutes : null,
+    patientName: patientName,
+    oldDateLabel: a.appointment_date,
+    oldTime: formatTime(a.appointment_time),
+    slotWindowDays: 21
+  };
+  showScreen('screen-reschedule');
+  $('#reschedule-heading').textContent = 'Choose a new time — ' + rescheduleState.practitionerName;
+  $('#reschedule-instruction').textContent = 'Currently ' + rescheduleState.oldDateLabel + ', ' + rescheduleState.oldTime + ' with ' + patientName + '.';
+  await renderRescheduleSlots();
+}
+
+async function renderRescheduleSlots(){
+  const list = $('#reschedule-slot-list');
+  list.innerHTML = '<li class="loading-text">Loading times...</li>';
+
+  const { data: availRows, error: availErr } = await db
+    .from('practitioner_availability').select('day_of_week, start_time, end_time')
+    .eq('practitioner_id', rescheduleState.practitionerId);
+  if(availErr){ showError('We could not load availability right now. Technical detail: ' + availErr.message); list.innerHTML = ''; return; }
+
+  const patternsByDay = {};
+  (availRows || []).forEach(a => { if(!patternsByDay[a.day_of_week]) patternsByDay[a.day_of_week] = []; patternsByDay[a.day_of_week].push(a); });
+
+  const today = new Date();
+  const rangeStart = formatDateISO(today);
+  const rangeEndDate = new Date(today); rangeEndDate.setDate(rangeEndDate.getDate() + rescheduleState.slotWindowDays);
+  const rangeEnd = formatDateISO(rangeEndDate);
+
+  const { data: bookedRows, error: bookedErr } = await db
+    .from('appointments').select('appointment_date, appointment_time')
+    .eq('practitioner_id', rescheduleState.practitionerId)
+    .gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd)
+    .not('status', 'in', '(cancelled,no-show)');
+  if(bookedErr){ showError('We could not check availability right now. Technical detail: ' + bookedErr.message); list.innerHTML = ''; return; }
+
+  const bookedSet = new Set((bookedRows || []).map(b => b.appointment_date + '_' + b.appointment_time.slice(0,5)));
+
+  const slots = [];
+  for(let i = 0; i < rescheduleState.slotWindowDays; i++){
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const patterns = patternsByDay[d.getDay()];
+    if(!patterns) continue;
+    const dateStr = formatDateISO(d);
+    const isToday = i === 0;
+    patterns.forEach(p => {
+      generateSlots(p.start_time, p.end_time, d, isToday, rescheduleState.practitionerDuration).forEach(t => {
+        if(!bookedSet.has(dateStr + '_' + t)) slots.push({ dateStr, dateLabel: formatDateLabel(d), time: t });
+      });
+    });
+  }
+
+  list.innerHTML = '';
+  if(slots.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No other open times for ' + rescheduleState.practitionerName + ' right now.';
+    list.appendChild(p);
+  } else {
+    slots.forEach(s => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+      btn.innerHTML = '<span class="who">' + s.dateLabel + ', ' + s.time + '</span>';
+      btn.addEventListener('click', () => confirmReschedule(s.dateStr, s.dateLabel, s.time));
+      li.appendChild(btn); list.appendChild(li);
+    });
+  }
+
+  $('#reschedule-load-more-btn').hidden = rescheduleState.slotWindowDays >= 90;
+}
+
+$('#reschedule-load-more-btn').addEventListener('click', async () => {
+  rescheduleState.slotWindowDays = Math.min(rescheduleState.slotWindowDays + 21, 90);
+  announce('Loading more dates...');
+  await renderRescheduleSlots();
+  announce('More dates loaded.');
+});
+
+async function confirmReschedule(newDateStr, newDateLabel, newTime){
+  clearError();
+  const { error: updateErr } = await db
+    .from('appointments')
+    .update({ appointment_date: newDateStr, appointment_time: newTime })
+    .eq('id', rescheduleState.apptId);
+
+  if(updateErr){
+    if(updateErr.code === '23505'){
+      showError('That time was just taken by someone else. Please choose a different time.');
+      await renderRescheduleSlots();
+    } else {
+      showError('We could not reschedule this appointment right now. Technical detail: ' + updateErr.message);
+    }
+    return;
+  }
+
+  await db.from('appointment_timeline').insert({
+    appointment_id: rescheduleState.apptId,
+    event_text: 'Rescheduled from ' + rescheduleState.oldDateLabel + ', ' + rescheduleState.oldTime + ' to ' + newDateLabel + ', ' + newTime
+  });
+
+  currentApptId = rescheduleState.apptId;
+  showScreen('screen-detail');
+  await renderDetail();
+  announce(rescheduleState.patientName + '\'s appointment moved to ' + newDateLabel + ' at ' + newTime + '.');
+}
+
+$('#reschedule-back-btn').addEventListener('click', async () => {
+  showScreen('screen-detail');
+  await renderDetail();
+});
+
+let wqState = {};
+
+$('#wq-nav-btn').addEventListener('click', () => { wqState = {}; openWalkinQueueFlow(); });
+$('#wq-patient-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#wq-done-back').addEventListener('click', async () => { showScreen('screen-today'); await loadToday(); });
+$('#wq-another-btn').addEventListener('click', () => { wqState = {}; openWalkinQueueFlow(); });
+
+async function openWalkinQueueFlow(){
+  showScreen('screen-wq-patient');
+  $('#wq-patient-search').value = '';
+  $('#wq-patient-results').innerHTML = '';
+  $('#wq-patient-search-area').hidden = false;
+  $('#wq-selected-patient').hidden = true;
+  $('#wq-new-patient-form').hidden = true;
+  wqState.patient = null;
+
+  if(staffLocationId){
+    wqState.locationId = staffLocationId;
+    $('#wq-location-area').hidden = true;
+  } else {
+    $('#wq-location-area').hidden = false;
+    const select = $('#wq-location-select');
+    select.innerHTML = '';
+    const { data: locs, error } = await db
+      .from('locations').select('id, name').eq('practice_id', staffPracticeId).eq('is_active', true);
+    if(error){ showError('We could not load locations right now. Technical detail: ' + error.message); return; }
+    (locs || []).forEach(loc => {
+      const opt = document.createElement('option'); opt.value = loc.id; opt.textContent = loc.name;
+      select.appendChild(opt);
+    });
+    wqState.locationId = locs && locs.length > 0 ? locs[0].id : null;
+    select.onchange = () => { wqState.locationId = select.value; };
+  }
+}
+
+let wqSearchDebounce = null;
+$('#wq-patient-search').addEventListener('input', (e) => {
+  clearTimeout(wqSearchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#wq-patient-results').innerHTML = ''; return; }
+  wqSearchDebounce = setTimeout(() => runWqPatientSearch(q), 300);
+});
+
+async function runWqPatientSearch(q){
+  const results = $('#wq-patient-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+  const { data, error } = await db
+    .from('patients').select('id, first_name, surname, mobile_number, email')
+    .eq('practice_id', staffPracticeId)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(10);
+  if(error){ results.innerHTML = ''; showError('We could not search right now. Technical detail: ' + error.message); return; }
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No matching patients. You can add them as a new patient instead.';
+    results.appendChild(p);
+    return;
+  }
+  data.forEach(p => {
+    const box = document.createElement('div'); box.className = 'search-result';
+    const nameEl = document.createElement('span'); nameEl.className = 'patient-name'; nameEl.textContent = p.first_name + ' ' + p.surname;
+    const contactEl = document.createElement('span'); contactEl.className = 'patient-contact'; contactEl.textContent = p.mobile_number || p.email || '—';
+    const btn = document.createElement('button'); btn.className = 'small-btn'; btn.type = 'button'; btn.textContent = 'Select';
+    btn.addEventListener('click', () => selectWqExistingPatient(p));
+    box.appendChild(nameEl); box.appendChild(contactEl); box.appendChild(btn);
+    results.appendChild(box);
+  });
+}
+
+function selectWqExistingPatient(p){
+  wqState.patient = { id: p.id, name: p.first_name + ' ' + p.surname };
+  $('#wq-patient-search-area').hidden = true;
+  $('#wq-selected-patient').hidden = false;
+  $('#wq-selected-summary').textContent = 'Selected: ' + wqState.patient.name;
+}
+
+$('#wq-change-patient-btn').addEventListener('click', () => {
+  $('#wq-patient-search-area').hidden = false;
+  $('#wq-selected-patient').hidden = true;
+  wqState.patient = null;
+});
+
+$('#wq-new-patient-btn').addEventListener('click', () => {
+  $('#wq-patient-search-area').hidden = true;
+  $('#wq-new-patient-form').hidden = false;
+  $('#wq-first-name').focus();
+});
+
+$('#wq-new-patient-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  let hasError = false, firstErrorField = null;
+  const checks = [
+    { id:'wq-first-name', label:'first name' }, { id:'wq-surname', label:'surname' },
+    { id:'wq-email', label:'email' }, { id:'wq-mobile', label:'mobile number' }
+  ];
+  checks.forEach(c => {
+    const input = $('#' + c.id); const errorEl = $('#' + c.id + '-error');
+    if(!input.value.trim()){ errorEl.textContent = 'Please add the patient\'s ' + c.label + '.'; errorEl.hidden = false; hasError = true; if(!firstErrorField) firstErrorField = input; }
+    else { errorEl.hidden = true; }
+  });
+  if(hasError){ announce('Please fill in the missing patient details.'); firstErrorField.focus(); return; }
+
+  wqState.patient = {
+    id: null,
+    firstName: $('#wq-first-name').value.trim(), surname: $('#wq-surname').value.trim(),
+    email: $('#wq-email').value.trim(), mobile: $('#wq-mobile').value.trim()
+  };
+  wqState.patient.name = wqState.patient.firstName + ' ' + wqState.patient.surname;
+  $('#wq-new-patient-form').hidden = true;
+  $('#wq-selected-patient').hidden = false;
+  $('#wq-selected-summary').textContent = 'New patient: ' + wqState.patient.name;
+});
+
+$('#wq-checkin-btn').addEventListener('click', async () => {
+  clearError();
+  if(!wqState.locationId){
+    showError('Please choose a location before adding this patient to the queue.');
+    return;
+  }
+  const btn = $('#wq-checkin-btn');
+  btn.disabled = true; btn.textContent = 'Adding...';
+
+  let patientId = wqState.patient.id;
+  if(!patientId){
+    const { data: newPatient, error: patientErr } = await db
+      .from('patients').insert({
+        practice_id: staffPracticeId, first_name: wqState.patient.firstName, surname: wqState.patient.surname,
+        email: wqState.patient.email, mobile_number: wqState.patient.mobile
+      }).select('id').single();
+    if(patientErr){
+      btn.disabled = false; btn.textContent = 'Add to queue';
+      showError('We could not save the patient\'s details right now. Technical detail: ' + patientErr.message);
+      return;
+    }
+    patientId = newPatient.id;
+  }
+
+  const rawToken = crypto.randomUUID().replace(/-/g,'') + crypto.randomUUID().replace(/-/g,'');
+  const tokenHash = await sha256Hex(rawToken);
+  const today = new Date();
+  const expiresAt = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+  const { error } = await db.from('queue_entries').insert({
+    practice_id: staffPracticeId,
+    location_id: wqState.locationId,
+    practitioner_id: null,
+    appointment_id: null,
+    patient_id: patientId,
+    is_walk_in: true,
+    token_hash: tokenHash,
+    expires_at: expiresAt.toISOString()
+  });
+
+  btn.disabled = false; btn.textContent = 'Add to queue';
+
+  if(error){
+    if(error.code === '23505'){
+      showError('This patient already has an active queue entry today.');
+    } else {
+      showError('We could not add this patient to the queue right now. Technical detail: ' + error.message);
+    }
+    return;
+  }
+
+  showScreen('screen-wq-done');
+  $('#wq-done-text').textContent = wqState.patient.name + ' has been added to the waiting queue.';
+  $('#wq-done-link').textContent = 'Share this link with the patient: ' + QUEUE_STATUS_BASE_URL + '/?token=' + rawToken;
+  announce(wqState.patient.name + ' added to the queue. A queue status link has been created.');
+});
+
+// QUEUE
+$('#queue-nav-btn').addEventListener('click', () => { showScreen('screen-queue'); loadQueue(); });
+
+async function loadQueue(){
+  clearError();
+  ['queue-with-practitioner','queue-called','queue-waiting','queue-stepped-away'].forEach(id => {
+    $('#' + id).innerHTML = '<p class="loading-text">Loading...</p>';
+  });
+  $('#queue-override-area').innerHTML = '';
+
+  let query = db
+    .from('queue_entries')
+    .select('id, status, is_walk_in, checked_in_at, appointment_id, patient_id, patients(first_name, surname), appointments(appointment_time)')
+    .eq('practice_id', staffPracticeId)
+    .in('status', ['waiting', 'called', 'with_practitioner', 'stepped_away']);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+
+  if(error){
+    showError('We could not load the queue right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  const entries = (data || []).map(e => {
+    const today = new Date();
+    let sortKey;
+    if(e.appointments && e.appointments.appointment_time){
+      const [h, m] = e.appointments.appointment_time.split(':').map(Number);
+      sortKey = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m).getTime();
+    } else {
+      sortKey = new Date(e.checked_in_at).getTime();
+    }
+    return { ...e, sortKey, patientName: e.patients ? (e.patients.first_name + ' ' + e.patients.surname) : 'Unknown patient' };
+  });
+
+  window.__queueEntries = entries;
+  renderQueue();
+}
+
+function renderQueue(){
+  const entries = window.__queueEntries || [];
+  const withPractitioner = entries.filter(e => e.status === 'with_practitioner');
+  const called = entries.filter(e => e.status === 'called');
+  const waiting = entries.filter(e => e.status === 'waiting').sort((a,b) => a.sortKey - b.sortKey);
+  const steppedAway = entries.filter(e => e.status === 'stepped_away');
+  const calculatedNextId = waiting.length > 0 ? waiting[0].id : null;
+
+  renderQueueSection('queue-with-practitioner', withPractitioner, 'No one currently with a practitioner.');
+  renderQueueSection('queue-called', called, 'No one has been called yet.');
+  renderQueueSection('queue-waiting', waiting, 'No one waiting right now.', calculatedNextId);
+  renderQueueSection('queue-stepped-away', steppedAway, 'No one has stepped away.');
+}
+
+function queueEntryLabel(e){
+  const timeLabel = e.appointments && e.appointments.appointment_time
+    ? formatTime(e.appointments.appointment_time) + ' booking'
+    : 'walk-in, checked in ' + new Date(e.checked_in_at).toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit' });
+  return e.patientName + ' — ' + timeLabel;
+}
+
+function renderQueueSection(containerId, list, emptyText, calculatedNextId){
+  const wrap = $('#' + containerId);
+  wrap.innerHTML = '';
+  if(list.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = emptyText;
+    wrap.appendChild(p);
+    return;
+  }
+  list.forEach(e => {
+    const card = document.createElement('div'); card.className = 'appt-card'; card.style.marginBottom = 'var(--s1)';
+    const isNext = e.id === calculatedNextId;
+    card.innerHTML = '<span class="who">' + queueEntryLabel(e) + (isNext ? ' <strong>(Up next)</strong>' : '') + '</span>';
+
+    const row = document.createElement('div'); row.className = 'action-row'; row.style.marginTop = '8px';
+    if(e.status === 'waiting'){
+      const btn = document.createElement('button'); btn.type = 'button';
+      btn.textContent = isNext ? 'Call Next' : 'Call this patient instead';
+      btn.addEventListener('click', () => handleCallPatient(e, isNext, calculatedNextId));
+      row.appendChild(btn);
+      addQueueSmallAction(row, 'Stepped away', () => updateQueueStatus(e, 'stepped_away'));
+      addQueueSmallAction(row, 'Left queue', () => updateQueueStatus(e, 'left'));
+    } else if(e.status === 'called'){
+      addQueueSmallAction(row, 'Start consultation', () => startConsultation(e));
+      addQueueSmallAction(row, 'Return to waiting', () => updateQueueStatus(e, 'waiting'));
+      addQueueSmallAction(row, 'Left queue', () => updateQueueStatus(e, 'left'));
+    } else if(e.status === 'with_practitioner'){
+      addQueueSmallAction(row, 'Complete', () => completeQueueEntry(e));
+    } else if(e.status === 'stepped_away'){
+      addQueueSmallAction(row, 'Returned — back to waiting', () => updateQueueStatus(e, 'waiting'));
+    }
+    card.appendChild(row);
+    wrap.appendChild(card);
+  });
+}
+
+function addQueueSmallAction(row, label, fn){
+  const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'secondary';
+  btn.textContent = label;
+  btn.addEventListener('click', fn);
+  row.appendChild(btn);
+}
+
+function handleCallPatient(entry, isCalculatedNext, calculatedNextId){
+  if(isCalculatedNext){
+    updateQueueStatus(entry, 'called', { called_at: new Date().toISOString() });
+    return;
+  }
+  const calculatedEntry = (window.__queueEntries || []).find(e => e.id === calculatedNextId);
+  confirmQueueOverride(entry, calculatedEntry);
+}
+
+function confirmQueueOverride(chosenEntry, calculatedEntry){
+  const area = $('#queue-override-area');
+  area.innerHTML = '';
+  const box = document.createElement('div'); box.className = 'confirm-dialog';
+  box.setAttribute('role', 'alertdialog');
+  const p = document.createElement('p');
+  p.textContent = 'Call ' + chosenEntry.patientName + ' ahead of ' + (calculatedEntry ? calculatedEntry.patientName : 'the next patient') + '?';
+  const reasonField = document.createElement('div'); reasonField.className = 'field';
+  const label = document.createElement('label'); label.textContent = 'Reason for calling out of order'; label.setAttribute('for', 'override-reason-input');
+  const input = document.createElement('input'); input.type = 'text'; input.id = 'override-reason-input';
+  reasonField.appendChild(label); reasonField.appendChild(input);
+  const rowEl = document.createElement('div'); rowEl.className = 'action-row';
+  const yesBtn = document.createElement('button'); yesBtn.type = 'button'; yesBtn.textContent = 'Confirm and call';
+  const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.className = 'secondary'; noBtn.textContent = 'Cancel';
+  yesBtn.addEventListener('click', async () => {
+    const reason = input.value.trim();
+    if(!reason){ showError('Please give a reason for calling out of order.'); return; }
+    area.innerHTML = '';
+    await recordOverrideAndCall(chosenEntry, calculatedEntry, reason);
+  });
+  noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Cancelled. No changes made.'); });
+  rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
+  box.appendChild(p); box.appendChild(reasonField); box.appendChild(rowEl); area.appendChild(box);
+  input.focus();
+}
+
+async function recordOverrideAndCall(chosenEntry, calculatedEntry, reason){
+  clearError();
+  const { data: userData } = await db.auth.getUser();
+  const { error: overrideErr } = await db.from('queue_override_events').insert({
+    queue_entry_id: chosenEntry.id,
+    calculated_next_patient_id: calculatedEntry ? calculatedEntry.patient_id : null,
+    actual_called_patient_id: chosenEntry.patient_id,
+    reason: reason,
+    overridden_by: userData.user.id
+  });
+  if(overrideErr){
+    showError('We could not record this override. Technical detail: ' + overrideErr.message);
+    return;
+  }
+  await updateQueueStatus(chosenEntry, 'called', { called_at: new Date().toISOString() });
+}
+
+async function startConsultation(entry){
+  await updateQueueStatus(entry, 'with_practitioner', { with_practitioner_at: new Date().toISOString() });
+  if(entry.appointment_id){
+    await db.from('appointments').update({ status: 'with-practitioner' }).eq('id', entry.appointment_id);
+    await db.from('appointment_timeline').insert({ appointment_id: entry.appointment_id, event_text: 'Marked as with practitioner (via queue)' });
+  }
+}
+
+async function completeQueueEntry(entry){
+  await updateQueueStatus(entry, 'completed', { completed_at: new Date().toISOString() });
+  if(entry.appointment_id){
+    await db.from('appointments').update({ status: 'completed' }).eq('id', entry.appointment_id);
+    await db.from('appointment_timeline').insert({ appointment_id: entry.appointment_id, event_text: 'Marked as completed (via queue)' });
+  }
+}
+
+async function updateQueueStatus(entry, newStatus, extraFields){
+  clearError();
+  const payload = Object.assign({ status: newStatus }, extraFields || {});
+  const { error } = await db.from('queue_entries').update(payload).eq('id', entry.id);
+  if(error){
+    showError('We could not update this queue entry right now. Technical detail: ' + error.message);
+    return;
+  }
+  announce(entry.patientName + ' is now ' + newStatus.replace('_', ' ') + '.');
+  await loadQueue();
+}
+
+checkExistingSession();
+</script>
+</body>
+</html>
