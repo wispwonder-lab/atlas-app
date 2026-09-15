@@ -744,15 +744,14 @@ async function updateStatus(newStatus, eventText){
 }
 
 async function notifyPractitionerOfCancellation(appt, patientName){
-  if(!appt || !appt.practitioner_id){ showError('Notification skipped — no practitioner on this appointment.'); return; }
+  if(!appt || !appt.practitioner_id) return;
   try{
-    const { data: staffRow, error: lookupErr } = await db
+    const { data: staffRow } = await db
       .from('staff_roles').select('user_id')
       .eq('practitioner_id', appt.practitioner_id).eq('role', 'practitioner').eq('is_active', true).maybeSingle();
-    if(lookupErr){ showError('Notification lookup failed. Technical detail: ' + lookupErr.message); return; }
-    if(!staffRow){ showError('Notification skipped — no active practitioner login found for this appointment.'); return; }
+    if(!staffRow) return;
 
-    const resp = await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
+    await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -761,9 +760,7 @@ async function notifyPractitionerOfCancellation(appt, patientName){
         body: patientName + '\'s appointment on ' + appt.appointment_date + ' at ' + formatTime(appt.appointment_time) + ' was just cancelled.'
       })
     });
-    const result = await resp.json().catch(() => ({}));
-    showError('Notification attempt result: ' + JSON.stringify(result));
-  } catch(e){ showError('Notification request failed entirely. Technical detail: ' + e.message); }
+  } catch(e){ /* silently ignore — the cancellation itself already succeeded */ }
 }
 
 function confirmCancel(patientName, appt){
