@@ -86,6 +86,10 @@
   .status.completed{ background:var(--success-bg); color:#15803d; }
   .status.cancelled{ background:var(--error-bg); color:#b91c1c; }
   .status.no-show{ background:#f1f5f9; color:var(--text-muted); }
+  .status.waiting{ background:var(--info-bg); color:var(--primary-dark); }
+  .status.called{ background:var(--warning-bg); color:#92400e; }
+  .status.stepped-away{ background:#f1f5f9; color:var(--text-muted); }
+  .status.left{ background:#f1f5f9; color:var(--text-muted); }
   .no-appts{ color:var(--text-muted); padding:var(--s2) 0; }
   .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
   .loading-text{ color:var(--text-muted); padding:var(--s2) 0; }
@@ -610,20 +614,45 @@ async function loadToday(){
     return;
   }
 
-  todaysAppointments = data || [];
+  const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+  const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+  let wqQuery = db
+    .from('queue_entries')
+    .select('id, status, checked_in_at, patients(first_name, surname)')
+    .eq('practice_id', staffPracticeId)
+    .eq('is_walk_in', true)
+    .is('appointment_id', null)
+    .gte('checked_in_at', dayStart)
+    .lt('checked_in_at', dayEnd);
+  if(staffLocationId) wqQuery = wqQuery.eq('location_id', staffLocationId);
+  const { data: wqData, error: wqError } = await wqQuery;
+
+  const walkInEntries = (wqError ? [] : (wqData || [])).map(w => ({
+    id: w.id,
+    isWalkInQueueEntry: true,
+    appointment_time: new Date(w.checked_in_at).toTimeString().slice(0,5),
+    status: w.status,
+    patients: w.patients
+  }));
+
+  todaysAppointments = [...(data || []), ...walkInEntries].sort((a,b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
   renderToday();
 }
 
 function renderToday(){
-  const active = todaysAppointments.filter(a => a.status !== 'cancelled');
-  const cancelled = todaysAppointments.filter(a => a.status === 'cancelled');
+  const finishedQueueStatuses = ['completed','left'];
+  const isFinished = a => a.isWalkInQueueEntry
+    ? finishedQueueStatuses.includes(a.status)
+    : (a.status === 'completed' || a.status === 'cancelled' || a.status === 'no-show');
+
+  const active = todaysAppointments.filter(a => !(a.isWalkInQueueEntry ? a.status === 'left' : a.status === 'cancelled'));
+  const cancelled = todaysAppointments.filter(a => a.isWalkInQueueEntry ? a.status === 'left' : a.status === 'cancelled');
   $('#summary-line').textContent = active.length + ' appointment' + (active.length === 1 ? '' : 's') + ' today, ' + cancelled.length + ' cancelled.';
 
-  const finishedStatuses = ['completed','cancelled','no-show'];
   const visible = showAllToday
     ? todaysAppointments
-    : todaysAppointments.filter(a => !finishedStatuses.includes(a.status));
-  const finishedCount = todaysAppointments.filter(a => finishedStatuses.includes(a.status)).length;
+    : todaysAppointments.filter(a => !isFinished(a));
+  const finishedCount = todaysAppointments.filter(isFinished).length;
 
   $('#show-all-toggle').textContent = showAllToday
     ? 'Show active only'
@@ -640,19 +669,30 @@ function renderToday(){
   }
   visible.forEach(a => {
     const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
-    const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
-    const locationName = a.locations ? a.locations.name : '';
     const time = formatTime(a.appointment_time);
     const li = document.createElement('li');
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'appt-card';
-    card.innerHTML =
-      '<span class="time">' + time + '</span> — ' +
-      '<span class="who">' + patientName + ', with ' + practitionerName + '</span>' +
-      '<span class="loc">' + locationName + '</span>' +
-      '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
-    card.addEventListener('click', () => openDetail(a.id, 'today'));
+
+    if(a.isWalkInQueueEntry){
+      const cssStatus = a.status.replace(/_/g, '-');
+      const labels = { waiting:'Waiting', called:'Called', 'with_practitioner':'With Practitioner', stepped_away:'Stepped Away', completed:'Completed', left:'Left' };
+      card.innerHTML =
+        '<span class="time">' + time + '</span> — ' +
+        '<span class="who">' + patientName + ' (walk-in, checked in)</span>' +
+        '<span class="status ' + cssStatus + '">Walk-in — ' + (labels[a.status] || a.status) + '</span>';
+      card.addEventListener('click', () => { showScreen('screen-queue'); loadQueue(); });
+    } else {
+      const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+      const locationName = a.locations ? a.locations.name : '';
+      card.innerHTML =
+        '<span class="time">' + time + '</span> — ' +
+        '<span class="who">' + patientName + ', with ' + practitionerName + '</span>' +
+        '<span class="loc">' + locationName + '</span>' +
+        '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+      card.addEventListener('click', () => openDetail(a.id, 'today'));
+    }
     li.appendChild(card);
     list.appendChild(li);
   });
