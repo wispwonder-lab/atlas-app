@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Your Queue Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --primary:#2563EB; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0;
+    --bg:#F8FAFC; --surface:#FFFFFF; --radius:12px; --s2:16px; --s3:24px;
+    --info-bg:#eaf1fe; --warning-bg:#fef6e7; --success-bg:#e9f8ee; --error-bg:#fdecec;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; font-size:17px; }
+  .wrap{ max-width:480px; margin:0 auto; padding:var(--s3) var(--s2) 60px; text-align:center; }
+  p.eyebrow{ font-size:14px; color:var(--text-muted); margin:0 0 4px; font-weight:500; }
+  .status-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--s3) var(--s2); margin-top:var(--s3); }
+  .status-card.waiting{ background:var(--info-bg); }
+  .status-card.called{ background:var(--warning-bg); }
+  .status-card.with_practitioner{ background:#ede9fe; }
+  .status-card.completed{ background:var(--success-bg); }
+  .status-card.error{ background:var(--error-bg); }
+  h1{ font-size:24px; margin:0 0 8px; }
+  .status-detail{ color:var(--text-muted); margin:0; }
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div aria-live="assertive" class="visually-hidden" id="live-region"></div>
+  <p class="eyebrow" id="practice-name-label">Atlas</p>
+  <div class="status-card" id="status-card">
+    <h1 id="status-heading" tabindex="-1">Loading your status...</h1>
+    <p class="status-detail" id="status-detail"></p>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (sel) => document.querySelector(sel);
+const live = $('#live-region');
+
+let lastAnnouncedStatus = null;
+let lastKnownOverrideAt = null;
+let pollTimer = null;
+
+function announce(msg){
+  live.textContent = '';
+  setTimeout(() => { live.textContent = msg; }, 30);
+}
+
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+const STATUS_TEXT = {
+  waiting: { heading: "You're in the queue", detail: "You're currently waiting. This page will update on its own — no need to refresh." },
+  called: { heading: "You've been called", detail: "Please make your way to reception now." },
+  with_practitioner: { heading: "You're being seen now", detail: '' },
+  stepped_away: { heading: "You're marked as stepped away", detail: "Please let reception know when you're back." },
+  left: { heading: "You've left the queue", detail: '' }
+};
+
+async function checkStatus(){
+  const params = new URLSearchParams(window.location.search);
+  const rawToken = params.get('token');
+  if(!rawToken){
+    showFinalState('error', 'No queue link found', "This page needs a valid queue link. Please check with reception.");
+    return;
+  }
+
+  const tokenHash = await sha256Hex(rawToken);
+  const { data, error } = await db.rpc('get_queue_status', { token_hash_input: tokenHash });
+
+  if(error || !data || data.length === 0){
+    showFinalState('error', "We couldn't find your queue status", "This link may have expired. Please check with reception.");
+    return;
+  }
+
+  const entry = data[0];
+  $('#practice-name-label').textContent = entry.practice_name || 'Atlas';
+
+  if(entry.status === 'completed'){
+    showFinalState('completed', 'Your visit is complete', 'Thank you for visiting ' + (entry.practice_name || 'us') + '.');
+    return;
+  }
+
+  let info;
+  const isNewOverride = entry.last_override_at && entry.last_override_at !== lastKnownOverrideAt;
+
+  if(entry.status === 'waiting' && entry.is_next){
+    info = { heading: "You're next!", detail: 'Please stay nearby — you should be called shortly.' };
+  } else if(entry.status === 'waiting' && typeof entry.people_ahead === 'number'){
+    info = {
+      heading: entry.people_ahead === 1 ? '1 person ahead of you' : entry.people_ahead + ' people ahead of you',
+      detail: "You're currently waiting. This page will update on its own — no need to refresh."
+    };
+  } else {
+    info = STATUS_TEXT[entry.status] || { heading: 'Status: ' + entry.status, detail: '' };
+  }
+
+  if(isNewOverride && entry.status === 'waiting'){
+    info = {
+      heading: info.heading,
+      detail: 'Another patient was called ahead of you. ' + info.detail
+    };
+  }
+
+  updateCard(entry.status, info.heading, info.detail);
+  if(entry.last_override_at) lastKnownOverrideAt = entry.last_override_at;
+
+  const announceKey = entry.status + '_' + entry.people_ahead + '_' + (isNewOverride ? 'override' : '');
+  if(announceKey !== lastAnnouncedStatus){
+    announce(info.heading + (info.detail ? '. ' + info.detail : ''));
+    lastAnnouncedStatus = announceKey;
+  }
+
+  pollTimer = setTimeout(checkStatus, 6000);
+}
+
+function updateCard(statusClass, heading, detail){
+  const card = $('#status-card');
+  card.className = 'status-card ' + statusClass;
+  $('#status-heading').textContent = heading;
+  $('#status-detail').textContent = detail;
+}
+
+function showFinalState(statusClass, heading, detail){
+  if(pollTimer) clearTimeout(pollTimer);
+  updateCard(statusClass, heading, detail);
+  if(heading !== lastAnnouncedStatus){
+    announce(heading + '. ' + detail);
+    lastAnnouncedStatus = heading;
+  }
+}
+
+checkStatus();
+</script>
+</body>
+</html>
