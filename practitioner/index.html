@@ -151,40 +151,82 @@
     <div id="extra-roles-area"></div>
   </section>
 
-  <!-- SOLO BOOKING -->
-  <section id="screen-solo-book" hidden>
-    <h2 id="solo-book-heading" tabindex="-1">Make appointment</h2>
-    <p class="instruction" id="solo-book-subheading">Choose an available time for your practice.</p>
-    <div class="field">
-      <label for="solo-book-search">Search for an existing patient</label>
-      <input type="search" id="solo-book-search" placeholder="Start typing a name or mobile number...">
-    </div>
-    <div id="solo-book-results"></div>
-    <button type="button" class="small-btn" id="solo-book-new-btn">+ New patient instead</button>
+  <!-- BOOK: CHOOSE PRACTITIONER -->
+  <section id="screen-book-practitioner" hidden>
+    <h2 id="book-practitioner-heading" tabindex="-1">Book an appointment</h2>
+    <p class="instruction">Choose a practitioner.</p>
+    <ul class="appt-list" id="book-practitioner-list"></ul>
+    <button type="button" class="back-btn" id="book-practitioner-back">Cancel and return</button>
+  </section>
 
-    <div id="solo-book-selected" hidden>
-      <p id="solo-book-selected-text"></p>
-      <button type="button" class="small-btn" id="solo-book-change-btn">Change patient</button>
+  <!-- BOOK: CHOOSE SLOT -->
+  <section id="screen-book-slot" hidden>
+    <h2 id="book-slot-heading" tabindex="-1">Choose a time</h2>
+    <ul class="appt-list" id="book-slot-list"></ul>
+    <button type="button" class="small-btn" id="book-load-more-btn" hidden>Load more dates</button>
+    <button type="button" class="back-btn" id="book-slot-back">Back</button>
+  </section>
+
+  <!-- BOOK: PATIENT -->
+  <section id="screen-book-patient" hidden>
+    <h2 id="book-patient-heading" tabindex="-1">Patient details</h2>
+    <p class="instruction" id="book-patient-subheading"></p>
+
+    <div id="book-patient-search-area">
+      <div class="field">
+        <label for="book-patient-search">Search for an existing patient</label>
+        <input type="search" id="book-patient-search" placeholder="Start typing a name or number...">
+      </div>
+      <div id="book-patient-results"></div>
+      <button type="button" class="small-btn" id="book-new-patient-btn">+ New patient instead</button>
     </div>
 
-    <form id="solo-book-new-form" hidden novalidate>
-      <div class="field"><label for="solo-first-name">First name</label><input id="solo-first-name" type="text" autocomplete="given-name"></div>
-      <div class="field"><label for="solo-surname">Surname</label><input id="solo-surname" type="text" autocomplete="family-name"></div>
-      <div class="field"><label for="solo-mobile">Mobile number</label><input id="solo-mobile" type="text" autocomplete="tel"></div>
-      <div class="field"><label for="solo-email">Email</label><input id="solo-email" type="email" autocomplete="email"></div>
-      <button type="submit" class="small-btn">Use new patient</button>
+    <div id="book-selected-patient" hidden>
+      <div class="summary-line" id="book-selected-summary"></div>
+      <button type="button" class="small-btn" id="book-change-patient-btn">Change patient</button>
+    </div>
+
+    <form id="book-new-patient-form" hidden novalidate>
+      <div class="field">
+        <label for="book-first-name">First name</label>
+        <input type="text" id="book-first-name">
+        <div class="error-text" id="book-first-name-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-surname">Surname</label>
+        <input type="text" id="book-surname">
+        <div class="error-text" id="book-surname-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-email">Email</label>
+        <input type="text" id="book-email" autocomplete="email">
+        <div class="error-text" id="book-email-error" hidden></div>
+      </div>
+      <div class="field">
+        <label for="book-mobile">Mobile number</label>
+        <input type="text" id="book-mobile" autocomplete="tel">
+        <div class="error-text" id="book-mobile-error" hidden></div>
+      </div>
+      <button type="submit" class="primary">Use these details</button>
     </form>
 
-    <div id="solo-book-time-area" hidden>
-      <h3>Choose a time</h3>
-      <ul class="appt-list" id="solo-book-slot-list"></ul>
+    <div id="book-reason-area" hidden>
       <div class="field">
-        <label for="solo-book-reason">Reason for visit (optional)</label>
-        <input id="solo-book-reason" type="text">
+        <label for="book-reason">Reason for visit (optional)</label>
+        <input type="text" id="book-reason">
       </div>
-      <button type="button" class="primary" id="solo-book-confirm" disabled>Confirm booking</button>
+      <button type="button" class="primary" id="book-confirm-btn">Confirm booking</button>
     </div>
-    <button type="button" class="back-btn" id="solo-book-back">Back to My Schedule</button>
+
+    <button type="button" class="back-btn" id="book-patient-back">Back</button>
+  </section>
+
+  <!-- BOOK: CONFIRMATION -->
+  <section id="screen-book-confirm" hidden>
+    <h2 id="book-confirm-heading" tabindex="-1">Booking confirmed</h2>
+    <p class="instruction" id="book-confirm-text"></p>
+    <button type="button" class="primary" id="book-another-btn">Book another appointment</button>
+    <button type="button" class="back-btn" id="book-confirm-back">Back to Today's Schedule</button>
   </section>
 
   <!-- APPOINTMENT DETAIL -->
@@ -209,7 +251,6 @@ let myPractitionerName = null;
 let myPractice_id = null;
 let myLocationId = null;
 let myAppointmentDuration = 30;
-let soloBookState = { patient: null, dateStr: null, dateLabel: null, time: null };
 let soloMode = false;
 let receptionUnavailable = false;
 let hasReceptionStaff = true;
@@ -477,131 +518,265 @@ $('#solo-toggle').addEventListener('click', async () => {
   }
 });
 
-let soloBookDebounce = null;
+let bookState = {};
 
-$('#solo-book-btn').addEventListener('click', openSoloBooking);
-$('#solo-book-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
-$('#solo-book-new-btn').addEventListener('click', () => {
-  $('#solo-book-new-form').hidden = false;
-  $('#solo-book-search').disabled = true;
-  $('#solo-book-new-btn').hidden = true;
-  $('#solo-first-name').focus();
-});
-$('#solo-book-change-btn').addEventListener('click', () => {
-  soloBookState.patient = null;
-  $('#solo-book-selected').hidden = true;
-  $('#solo-book-time-area').hidden = true;
-  $('#solo-book-search').disabled = false;
-  $('#solo-book-new-btn').hidden = false;
-  $('#solo-book-search').focus();
-});
-$('#solo-book-search').addEventListener('input', (e) => {
-  clearTimeout(soloBookDebounce);
-  const q = e.target.value.trim();
-  if(!q){ $('#solo-book-results').innerHTML = ''; return; }
-  soloBookDebounce = setTimeout(() => runSoloPatientSearch(q), 300);
-});
-$('#solo-book-new-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const firstName=$('#solo-first-name').value.trim(), surname=$('#solo-surname').value.trim(), mobile=$('#solo-mobile').value.trim(), email=$('#solo-email').value.trim();
-  if(!firstName || !surname || !mobile){ showError('Please enter the patient\'s first name, surname and mobile number.'); return; }
-  soloBookState.patient={id:null,name:firstName+' '+surname,firstName,surname,mobile,email};
-  $('#solo-book-new-form').hidden=true;
-  $('#solo-book-selected').hidden=false;
-  $('#solo-book-selected-text').textContent='New patient: '+soloBookState.patient.name;
-  loadSoloBookSlots();
-});
-async function runSoloPatientSearch(q){
-  const box=$('#solo-book-results'); box.innerHTML='<p class="loading-text">Searching...</p>';
-  const {data,error}=await db.from('patients').select('id,first_name,surname,mobile_number,email')
-    .eq('practice_id',myPractice_id)
-    .or('first_name.ilike.%'+q+'%,surname.ilike.%'+q+'%,mobile_number.ilike.%'+q+'%').limit(10);
-  if(error){ box.innerHTML=''; showError('We could not search patients right now. Technical detail: '+error.message); return; }
-  box.innerHTML='';
-  (data||[]).forEach(p=>{
-    const row=document.createElement('div'); row.className='search-result';
-    const name=document.createElement('span'); name.className='patient-name'; name.textContent=p.first_name+' '+p.surname;
-    const contact=document.createElement('span'); contact.className='patient-contact'; contact.textContent=p.mobile_number||p.email||'—';
-    const btn=document.createElement('button'); btn.type='button'; btn.className='small-btn'; btn.textContent='Select';
-    btn.addEventListener('click',()=>selectSoloPatient(p)); row.append(name,contact,btn); box.appendChild(row);
-  });
-  if(!(data||[]).length) box.innerHTML='<p class="no-appts">No matching patient found. You can add a new patient.</p>';
-}
-function selectSoloPatient(p){
-  soloBookState.patient={id:p.id,name:p.first_name+' '+p.surname};
-  $('#solo-book-results').innerHTML='';
-  $('#solo-book-search').disabled=true;
-  $('#solo-book-new-btn').hidden=true;
-  $('#solo-book-selected').hidden=false;
-  $('#solo-book-selected-text').textContent='Selected: '+soloBookState.patient.name;
-  loadSoloBookSlots();
-}
-async function openSoloBooking(){
-  soloBookState={patient:null,dateStr:null,dateLabel:null,time:null};
-  $('#solo-book-search').value='';
-  $('#solo-book-results').innerHTML='';
-  $('#solo-book-search').disabled=false;
-  $('#solo-book-new-btn').hidden=false;
-  $('#solo-book-new-form').hidden=true;
-  $('#solo-book-selected').hidden=true;
-  $('#solo-book-time-area').hidden=true;
-  $('#solo-book-reason').value='';
-  $('#solo-book-confirm').disabled=true;
-  showScreen('screen-solo-book');
-  announce('Make appointment. Search for a patient or add a new patient.');
-}
-async function loadSoloBookSlots(){
-  if(!soloBookState.patient) return;
-  $('#solo-book-time-area').hidden=false;
-  $('#solo-book-slot-list').innerHTML='<li class="loading-text">Loading available times...</li>';
-  const {data:avail,error:availErr}=await db.from('practitioner_availability').select('day_of_week,start_time,end_time').eq('practitioner_id',myPractitionerId);
-  if(availErr){showError('We could not load availability. Technical detail: '+availErr.message);return;}
-  const patterns={}; (avail||[]).forEach(x=>(patterns[x.day_of_week]||(patterns[x.day_of_week]=[])).push(x));
-  const today=new Date(), bookedRange=new Date(today); bookedRange.setDate(bookedRange.getDate()+21);
-  const {data:booked,error:bookErr}=await db.from('appointments').select('appointment_date,appointment_time')
-    .eq('practitioner_id',myPractitionerId).gte('appointment_date',formatDateISO(today)).lte('appointment_date',formatDateISO(bookedRange))
-    .not('status','in','(cancelled,no-show)');
-  if(bookErr){showError('We could not check available times. Technical detail: '+bookErr.message);return;}
-  const bookedSet=new Set((booked||[]).map(x=>x.appointment_date+'_'+x.appointment_time.slice(0,5)));
-  const slots=[];
-  for(let i=0;i<=21;i++){
-    const d=new Date(today); d.setDate(d.getDate()+i); const pats=patterns[d.getDay()]; if(!pats) continue;
-    pats.forEach(p=>generateSlots(p.start_time,p.end_time,d,i===0,myAppointmentDuration).forEach(t=>{
-      const ds=formatDateISO(d); if(!bookedSet.has(ds+'_'+t)) slots.push({dateStr:ds,dateLabel:formatDateLabel(d),time:t});
-    }));
+$('#book-nav-btn').addEventListener('click', () => { bookState = {}; openSoloBookFlow(); });
+$('#book-practitioner-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
+$('#book-slot-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
+$('#book-patient-back').addEventListener('click', () => { showScreen('screen-book-slot'); });
+$('#book-confirm-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
+$('#book-another-btn').addEventListener('click', () => { bookState = {}; openSoloBookFlow(); });
+
+async function openBookFlow(){
+  showScreen('screen-book-practitioner');
+  const list = $('#book-practitioner-list');
+  list.innerHTML = '<li class="loading-text">Loading practitioners...</li>';
+
+  let query = db.from('practitioners').select('id, name, role, appointment_duration_minutes')
+    .eq('practice_id', myPractice_id).eq('is_active', true).eq('is_available', true);
+  if(myLocationId) query = query.eq('location_id', myLocationId);
+  const { data, error } = await query;
+
+  if(error){ showError('We could not load practitioners right now. Technical detail: ' + error.message); list.innerHTML = ''; return; }
+
+  list.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No practitioners are available to book right now.';
+    list.appendChild(p);
+    return;
   }
-  const list=$('#solo-book-slot-list'); list.innerHTML='';
-  slots.forEach(s=>{
-    const li=document.createElement('li'), btn=document.createElement('button');
-    btn.type='button'; btn.className='appt-card'; btn.textContent=s.dateLabel+', '+s.time;
-    btn.addEventListener('click',()=>{
-      soloBookState.dateStr=s.dateStr; soloBookState.dateLabel=s.dateLabel; soloBookState.time=s.time;
-      document.querySelectorAll('#solo-book-slot-list .appt-card').forEach(x=>x.removeAttribute('aria-current'));
-      btn.setAttribute('aria-current','true'); $('#solo-book-confirm').disabled=false; announce('Selected '+s.dateLabel+', '+s.time);
-    });
+  data.forEach(pr => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+    btn.innerHTML = '<span class="who">' + pr.name + ' — ' + pr.role + '</span>';
+    btn.addEventListener('click', () => { bookState.practitioner = pr; loadBookSlots(); });
     li.appendChild(btn); list.appendChild(li);
   });
-  if(!slots.length) list.innerHTML='<li><p class="no-appts">No upcoming openings found.</p></li>';
 }
-$('#solo-book-confirm').addEventListener('click',async()=>{
-  if(!soloBookState.patient||!soloBookState.dateStr||!soloBookState.time)return;
-  const btn=$('#solo-book-confirm'); btn.disabled=true; btn.textContent='Booking...'; clearError();
-  let patientId=soloBookState.patient.id;
-  if(!patientId){
-    const {data:newP,error}=await db.from('patients').insert({practice_id:myPractice_id,first_name:soloBookState.patient.firstName,surname:soloBookState.patient.surname,mobile_number:soloBookState.patient.mobile,email:soloBookState.patient.email||null}).select('id').single();
-    if(error){showError('We could not save the patient. Technical detail: '+error.message);btn.disabled=false;btn.textContent='Confirm booking';return;}
-    patientId=newP.id;
+
+const BOOK_SLOT_WINDOW_STEP_DAYS = 21;
+
+async function loadBookSlots(){
+  bookState.slotWindowDays = BOOK_SLOT_WINDOW_STEP_DAYS;
+  showScreen('screen-book-slot');
+  $('#book-slot-heading').textContent = 'Choose a time — ' + bookState.practitioner.name;
+  $('#book-slot-list').innerHTML = '<li class="loading-text">Loading times...</li>';
+  await renderBookSlots();
+}
+
+async function renderBookSlots(){
+  const list = $('#book-slot-list');
+
+  const { data: availRows, error: availErr } = await db
+    .from('practitioner_availability').select('day_of_week, start_time, end_time')
+    .eq('practitioner_id', bookState.practitioner.id);
+  if(availErr){ showError('We could not load availability right now. Technical detail: ' + availErr.message); list.innerHTML = ''; return; }
+
+  const patternsByDay = {};
+  (availRows || []).forEach(a => { if(!patternsByDay[a.day_of_week]) patternsByDay[a.day_of_week] = []; patternsByDay[a.day_of_week].push(a); });
+
+  const today = new Date();
+  const rangeStart = formatDateISO(today);
+  const rangeEndDate = new Date(today); rangeEndDate.setDate(rangeEndDate.getDate() + bookState.slotWindowDays);
+  const rangeEnd = formatDateISO(rangeEndDate);
+
+  const { data: bookedRows, error: bookedErr } = await db
+    .from('appointments').select('appointment_date, appointment_time')
+    .eq('practitioner_id', bookState.practitioner.id)
+    .gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd)
+    .not('status', 'in', '(cancelled,no-show)');
+  if(bookedErr){ showError('We could not check availability right now. Technical detail: ' + bookedErr.message); list.innerHTML = ''; return; }
+
+  const bookedSet = new Set((bookedRows || []).map(b => b.appointment_date + '_' + b.appointment_time.slice(0,5)));
+
+  const slots = [];
+  for(let i = 0; i < bookState.slotWindowDays; i++){
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const patterns = patternsByDay[d.getDay()];
+    if(!patterns) continue;
+    const dateStr = formatDateISO(d);
+    const isToday = i === 0;
+    patterns.forEach(p => {
+      generateSlots(p.start_time, p.end_time, d, isToday, bookState.practitioner.appointment_duration_minutes).forEach(t => {
+        if(!bookedSet.has(dateStr + '_' + t)) slots.push({ dateStr, dateLabel: formatDateLabel(d), time: t });
+      });
+    });
   }
-  const {data:appt,error}=await db.from('appointments').insert({
-    practice_id:myPractice_id,location_id:myLocationId,practitioner_id:myPractitionerId,patient_id:patientId,
-    appointment_date:soloBookState.dateStr,appointment_time:soloBookState.time,status:'booked',reason:$('#solo-book-reason').value.trim()||null
-  }).select('id').single();
-  if(error){showError(error.code==='23505'?'That time was just taken. Please choose another time.':'We could not save the appointment. Technical detail: '+error.message);btn.disabled=false;btn.textContent='Confirm booking';return;}
-  await db.from('appointment_timeline').insert({appointment_id:appt.id,event_text:'Booked by practitioner'});
-  btn.textContent='Booked';
-  announce('Appointment booked for '+soloBookState.patient.name+', '+soloBookState.dateLabel+' at '+soloBookState.time+'.');
-  setTimeout(async()=>{showScreen('screen-schedule');await loadSchedule();},300);
+
+  list.innerHTML = '';
+  if(slots.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No upcoming openings found for this practitioner.';
+    list.appendChild(p);
+  } else {
+    slots.forEach(s => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'appt-card';
+      btn.innerHTML = '<span class="who">' + s.dateLabel + ', ' + s.time + '</span>';
+      btn.addEventListener('click', () => { bookState.dateStr = s.dateStr; bookState.dateLabel = s.dateLabel; bookState.time = s.time; openBookPatientStep(); });
+      li.appendChild(btn); list.appendChild(li);
+    });
+  }
+
+  $('#book-load-more-btn').hidden = bookState.slotWindowDays >= 90;
+}
+
+$('#book-load-more-btn').addEventListener('click', async () => {
+  bookState.slotWindowDays = Math.min(bookState.slotWindowDays + BOOK_SLOT_WINDOW_STEP_DAYS, 90);
+  announce('Loading more dates...');
+  await renderBookSlots();
+  announce('More dates loaded.');
 });
+
+function openBookPatientStep(){
+  showScreen('screen-book-patient');
+  $('#book-patient-subheading').textContent = bookState.practitioner.name + ', ' + bookState.dateLabel + ', ' + bookState.time;
+  $('#book-patient-search').value = '';
+  $('#book-patient-results').innerHTML = '';
+  $('#book-patient-search-area').hidden = false;
+  $('#book-selected-patient').hidden = true;
+  $('#book-new-patient-form').hidden = true;
+  $('#book-reason-area').hidden = true;
+  $('#book-reason').value = '';
+  bookState.patient = null;
+}
+
+let bookSearchDebounce = null;
+$('#book-patient-search').addEventListener('input', (e) => {
+  clearTimeout(bookSearchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#book-patient-results').innerHTML = ''; return; }
+  bookSearchDebounce = setTimeout(() => runBookPatientSearch(q), 300);
+});
+
+async function runBookPatientSearch(q){
+  const results = $('#book-patient-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+  const { data, error } = await db
+    .from('patients').select('id, first_name, surname, mobile_number, email')
+    .eq('practice_id', myPractice_id)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(10);
+  if(error){ results.innerHTML = ''; showError('We could not search right now. Technical detail: ' + error.message); return; }
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts';
+    p.textContent = 'No matching patients. You can add them as a new patient instead.';
+    results.appendChild(p);
+    return;
+  }
+  data.forEach(p => {
+    const box = document.createElement('div'); box.className = 'search-result';
+    const nameEl = document.createElement('span'); nameEl.className = 'patient-name'; nameEl.textContent = p.first_name + ' ' + p.surname;
+    const contactEl = document.createElement('span'); contactEl.className = 'patient-contact'; contactEl.textContent = p.mobile_number || p.email || '—';
+    const btn = document.createElement('button'); btn.className = 'small-btn'; btn.type = 'button'; btn.textContent = 'Select';
+    btn.addEventListener('click', () => selectExistingPatient(p));
+    box.appendChild(nameEl); box.appendChild(contactEl); box.appendChild(btn);
+    results.appendChild(box);
+  });
+}
+
+function selectExistingPatient(p){
+  bookState.patient = { id: p.id, name: p.first_name + ' ' + p.surname };
+  $('#book-patient-search-area').hidden = true;
+  $('#book-selected-patient').hidden = false;
+  $('#book-selected-summary').textContent = 'Selected: ' + bookState.patient.name;
+  $('#book-reason-area').hidden = false;
+}
+
+$('#book-change-patient-btn').addEventListener('click', () => { openBookPatientStep(); });
+
+$('#book-new-patient-btn').addEventListener('click', () => {
+  $('#book-patient-search-area').hidden = true;
+  $('#book-new-patient-form').hidden = false;
+  $('#book-first-name').focus();
+});
+
+$('#book-new-patient-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  let hasError = false, firstErrorField = null;
+  const checks = [
+    { id:'book-first-name', label:'first name' }, { id:'book-surname', label:'surname' },
+    { id:'book-email', label:'email' }, { id:'book-mobile', label:'mobile number' }
+  ];
+  checks.forEach(c => {
+    const input = $('#' + c.id); const errorEl = $('#' + c.id + '-error');
+    if(!input.value.trim()){ errorEl.textContent = 'Please add the patient\'s ' + c.label + '.'; errorEl.hidden = false; hasError = true; if(!firstErrorField) firstErrorField = input; }
+    else { errorEl.hidden = true; }
+  });
+  if(hasError){ announce('Please fill in the missing patient details.'); firstErrorField.focus(); return; }
+
+  bookState.patient = {
+    id: null,
+    firstName: $('#book-first-name').value.trim(), surname: $('#book-surname').value.trim(),
+    email: $('#book-email').value.trim(), mobile: $('#book-mobile').value.trim()
+  };
+  bookState.patient.name = bookState.patient.firstName + ' ' + bookState.patient.surname;
+  $('#book-new-patient-form').hidden = true;
+  $('#book-selected-patient').hidden = false;
+  $('#book-selected-summary').textContent = 'New patient: ' + bookState.patient.name;
+  $('#book-reason-area').hidden = false;
+});
+
+$('#book-confirm-btn').addEventListener('click', async () => {
+  clearError();
+  const btn = $('#book-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Booking...';
+  const reason = $('#book-reason').value.trim();
+
+  let patientId = bookState.patient.id;
+  if(!patientId){
+    const { data: newPatient, error: patientErr } = await db
+      .from('patients').insert({
+        practice_id: myPractice_id, first_name: bookState.patient.firstName, surname: bookState.patient.surname,
+        email: bookState.patient.email, mobile_number: bookState.patient.mobile
+      }).select('id').single();
+    if(patientErr){
+      showError('We could not save the patient\'s details right now. Technical detail: ' + patientErr.message);
+      btn.disabled = false; btn.textContent = 'Confirm booking';
+      return;
+    }
+    patientId = newPatient.id;
+  }
+
+  const { data: appt, error: apptErr } = await db
+    .from('appointments').insert({
+      practice_id: myPractice_id, location_id: myLocationId, practitioner_id: bookState.practitioner.id,
+      patient_id: patientId, appointment_date: bookState.dateStr, appointment_time: bookState.time,
+      status: 'booked', reason: reason || null
+    }).select('id').single();
+
+  btn.disabled = false; btn.textContent = 'Confirm booking';
+
+  if(apptErr){
+    if(apptErr.code === '23505'){
+      showError('That time was just taken. Please choose a different time.');
+      loadBookSlots();
+    } else {
+      showError('We could not save this booking right now. Technical detail: ' + apptErr.message);
+    }
+    return;
+  }
+
+  await db.from('appointment_timeline').insert({ appointment_id: appt.id, event_text: 'Booked by reception' });
+
+  showScreen('screen-book-confirm');
+  const text = bookState.patient.name + ' — ' + bookState.practitioner.name + ', ' + bookState.dateLabel + ' at ' + bookState.time + '.';
+  $('#book-confirm-text').textContent = text;
+  announce('Booking confirmed. ' + text);
+});
+
+async function openSoloBookFlow(){
+  bookState = {
+    practitioner: { id: myPractitionerId, name: myPractitionerName, appointment_duration_minutes: myAppointmentDuration },
+    slotWindowDays: BOOK_SLOT_WINDOW_STEP_DAYS
+  };
+  await loadBookSlots();
+}
+
+$('#solo-book-btn').addEventListener('click', openSoloBookFlow);
+
 
 function confirmSoloCancel(patientName){
   const area=$('#action-area'); area.innerHTML='';
