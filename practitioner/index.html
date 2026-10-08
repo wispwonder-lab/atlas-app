@@ -137,10 +137,54 @@
 
     <div id="focus-area"></div>
 
+    <section id="solo-tools-area" class="extra-role-box" hidden aria-labelledby="solo-tools-heading">
+      <h3 id="solo-tools-heading">Solo practice tools</h3>
+      <p class="instruction">Because this practice has no reception staff, you can manage appointments and patient flow here.</p>
+      <div class="action-row">
+        <button type="button" class="primary" id="solo-book-btn">Make appointment</button>
+      </div>
+    </section>
+
     <h3>Today's appointments</h3>
     <ul class="appt-list" id="appt-list"></ul>
 
     <div id="extra-roles-area"></div>
+  </section>
+
+  <!-- SOLO BOOKING -->
+  <section id="screen-solo-book" hidden>
+    <h2 id="solo-book-heading" tabindex="-1">Make appointment</h2>
+    <p class="instruction" id="solo-book-subheading">Choose an available time for your practice.</p>
+    <div class="field">
+      <label for="solo-book-search">Search for an existing patient</label>
+      <input type="search" id="solo-book-search" placeholder="Start typing a name or mobile number...">
+    </div>
+    <div id="solo-book-results"></div>
+    <button type="button" class="small-btn" id="solo-book-new-btn">+ New patient instead</button>
+
+    <div id="solo-book-selected" hidden>
+      <p id="solo-book-selected-text"></p>
+      <button type="button" class="small-btn" id="solo-book-change-btn">Change patient</button>
+    </div>
+
+    <form id="solo-book-new-form" hidden novalidate>
+      <div class="field"><label for="solo-first-name">First name</label><input id="solo-first-name" type="text" autocomplete="given-name"></div>
+      <div class="field"><label for="solo-surname">Surname</label><input id="solo-surname" type="text" autocomplete="family-name"></div>
+      <div class="field"><label for="solo-mobile">Mobile number</label><input id="solo-mobile" type="text" autocomplete="tel"></div>
+      <div class="field"><label for="solo-email">Email</label><input id="solo-email" type="email" autocomplete="email"></div>
+      <button type="submit" class="small-btn">Use new patient</button>
+    </form>
+
+    <div id="solo-book-time-area" hidden>
+      <h3>Choose a time</h3>
+      <ul class="appt-list" id="solo-book-slot-list"></ul>
+      <div class="field">
+        <label for="solo-book-reason">Reason for visit (optional)</label>
+        <input id="solo-book-reason" type="text">
+      </div>
+      <button type="button" class="primary" id="solo-book-confirm" disabled>Confirm booking</button>
+    </div>
+    <button type="button" class="back-btn" id="solo-book-back">Back to My Schedule</button>
   </section>
 
   <!-- APPOINTMENT DETAIL -->
@@ -163,6 +207,9 @@ const live = $('#live-region');
 let myPractitionerId = null;
 let myPractitionerName = null;
 let myPractice_id = null;
+let myLocationId = null;
+let myAppointmentDuration = 30;
+let soloBookState = { patient: null, dateStr: null, dateLabel: null, time: null };
 let soloMode = false;
 let receptionUnavailable = false;
 let hasReceptionStaff = true;
@@ -242,7 +289,11 @@ async function handleLoggedIn(user){
   const { data: practiceRow } = await db
     .from('practices').select('has_reception_staff').eq('id', myPractice_id).maybeSingle();
   hasReceptionStaff = practiceRow ? practiceRow.has_reception_staff !== false : true;
+  const { data: practitionerRow } = await db.from('practitioners').select('location_id, appointment_duration_minutes').eq('id', myPractitionerId).maybeSingle();
+  myLocationId = practitionerRow ? practitionerRow.location_id : null;
+  myAppointmentDuration = practitionerRow && practitionerRow.appointment_duration_minutes ? practitionerRow.appointment_duration_minutes : 30;
   $('#solo-toggle-row').hidden = !hasReceptionStaff;
+  $('#solo-tools-area').hidden = hasReceptionStaff;
   if(!hasReceptionStaff){ soloMode = true; }
 
   $('#brand-eyebrow').textContent = 'Atlas — Practitioner';
@@ -409,6 +460,155 @@ $('#solo-toggle').addEventListener('click', async () => {
   }
 });
 
+let soloBookDebounce = null;
+
+$('#solo-book-btn').addEventListener('click', openSoloBooking);
+$('#solo-book-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
+$('#solo-book-new-btn').addEventListener('click', () => {
+  $('#solo-book-new-form').hidden = false;
+  $('#solo-book-search').disabled = true;
+  $('#solo-book-new-btn').hidden = true;
+  $('#solo-first-name').focus();
+});
+$('#solo-book-change-btn').addEventListener('click', () => {
+  soloBookState.patient = null;
+  $('#solo-book-selected').hidden = true;
+  $('#solo-book-time-area').hidden = true;
+  $('#solo-book-search').disabled = false;
+  $('#solo-book-new-btn').hidden = false;
+  $('#solo-book-search').focus();
+});
+$('#solo-book-search').addEventListener('input', (e) => {
+  clearTimeout(soloBookDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#solo-book-results').innerHTML = ''; return; }
+  soloBookDebounce = setTimeout(() => runSoloPatientSearch(q), 300);
+});
+$('#solo-book-new-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const firstName=$('#solo-first-name').value.trim(), surname=$('#solo-surname').value.trim(), mobile=$('#solo-mobile').value.trim(), email=$('#solo-email').value.trim();
+  if(!firstName || !surname || !mobile){ showError('Please enter the patient\'s first name, surname and mobile number.'); return; }
+  soloBookState.patient={id:null,name:firstName+' '+surname,firstName,surname,mobile,email};
+  $('#solo-book-new-form').hidden=true;
+  $('#solo-book-selected').hidden=false;
+  $('#solo-book-selected-text').textContent='New patient: '+soloBookState.patient.name;
+  loadSoloBookSlots();
+});
+async function runSoloPatientSearch(q){
+  const box=$('#solo-book-results'); box.innerHTML='<p class="loading-text">Searching...</p>';
+  const {data,error}=await db.from('patients').select('id,first_name,surname,mobile_number,email')
+    .eq('practice_id',myPractice_id)
+    .or('first_name.ilike.%'+q+'%,surname.ilike.%'+q+'%,mobile_number.ilike.%'+q+'%').limit(10);
+  if(error){ box.innerHTML=''; showError('We could not search patients right now. Technical detail: '+error.message); return; }
+  box.innerHTML='';
+  (data||[]).forEach(p=>{
+    const row=document.createElement('div'); row.className='search-result';
+    const name=document.createElement('span'); name.className='patient-name'; name.textContent=p.first_name+' '+p.surname;
+    const contact=document.createElement('span'); contact.className='patient-contact'; contact.textContent=p.mobile_number||p.email||'—';
+    const btn=document.createElement('button'); btn.type='button'; btn.className='small-btn'; btn.textContent='Select';
+    btn.addEventListener('click',()=>selectSoloPatient(p)); row.append(name,contact,btn); box.appendChild(row);
+  });
+  if(!(data||[]).length) box.innerHTML='<p class="no-appts">No matching patient found. You can add a new patient.</p>';
+}
+function selectSoloPatient(p){
+  soloBookState.patient={id:p.id,name:p.first_name+' '+p.surname};
+  $('#solo-book-results').innerHTML='';
+  $('#solo-book-search').disabled=true;
+  $('#solo-book-new-btn').hidden=true;
+  $('#solo-book-selected').hidden=false;
+  $('#solo-book-selected-text').textContent='Selected: '+soloBookState.patient.name;
+  loadSoloBookSlots();
+}
+async function openSoloBooking(){
+  soloBookState={patient:null,dateStr:null,dateLabel:null,time:null};
+  $('#solo-book-search').value='';
+  $('#solo-book-results').innerHTML='';
+  $('#solo-book-search').disabled=false;
+  $('#solo-book-new-btn').hidden=false;
+  $('#solo-book-new-form').hidden=true;
+  $('#solo-book-selected').hidden=true;
+  $('#solo-book-time-area').hidden=true;
+  $('#solo-book-reason').value='';
+  $('#solo-book-confirm').disabled=true;
+  showScreen('screen-solo-book');
+  announce('Make appointment. Search for a patient or add a new patient.');
+}
+async function loadSoloBookSlots(){
+  if(!soloBookState.patient) return;
+  $('#solo-book-time-area').hidden=false;
+  $('#solo-book-slot-list').innerHTML='<li class="loading-text">Loading available times...</li>';
+  const {data:avail,error:availErr}=await db.from('practitioner_availability').select('day_of_week,start_time,end_time').eq('practitioner_id',myPractitionerId);
+  if(availErr){showError('We could not load availability. Technical detail: '+availErr.message);return;}
+  const patterns={}; (avail||[]).forEach(x=>(patterns[x.day_of_week]||(patterns[x.day_of_week]=[])).push(x));
+  const today=new Date(), bookedRange=new Date(today); bookedRange.setDate(bookedRange.getDate()+21);
+  const {data:booked,error:bookErr}=await db.from('appointments').select('appointment_date,appointment_time')
+    .eq('practitioner_id',myPractitionerId).gte('appointment_date',formatDateISO(today)).lte('appointment_date',formatDateISO(bookedRange))
+    .not('status','in','(cancelled,no-show)');
+  if(bookErr){showError('We could not check available times. Technical detail: '+bookErr.message);return;}
+  const bookedSet=new Set((booked||[]).map(x=>x.appointment_date+'_'+x.appointment_time.slice(0,5)));
+  const slots=[];
+  for(let i=0;i<=21;i++){
+    const d=new Date(today); d.setDate(d.getDate()+i); const pats=patterns[d.getDay()]; if(!pats) continue;
+    pats.forEach(p=>generateSlots(p.start_time,p.end_time,d,i===0,myAppointmentDuration).forEach(t=>{
+      const ds=formatDateISO(d); if(!bookedSet.has(ds+'_'+t)) slots.push({dateStr:ds,dateLabel:formatDateLabel(d),time:t});
+    }));
+  }
+  const list=$('#solo-book-slot-list'); list.innerHTML='';
+  slots.forEach(s=>{
+    const li=document.createElement('li'), btn=document.createElement('button');
+    btn.type='button'; btn.className='appt-card'; btn.textContent=s.dateLabel+', '+s.time;
+    btn.addEventListener('click',()=>{
+      soloBookState.dateStr=s.dateStr; soloBookState.dateLabel=s.dateLabel; soloBookState.time=s.time;
+      document.querySelectorAll('#solo-book-slot-list .appt-card').forEach(x=>x.removeAttribute('aria-current'));
+      btn.setAttribute('aria-current','true'); $('#solo-book-confirm').disabled=false; announce('Selected '+s.dateLabel+', '+s.time);
+    });
+    li.appendChild(btn); list.appendChild(li);
+  });
+  if(!slots.length) list.innerHTML='<li><p class="no-appts">No upcoming openings found.</p></li>';
+}
+$('#solo-book-confirm').addEventListener('click',async()=>{
+  if(!soloBookState.patient||!soloBookState.dateStr||!soloBookState.time)return;
+  const btn=$('#solo-book-confirm'); btn.disabled=true; btn.textContent='Booking...'; clearError();
+  let patientId=soloBookState.patient.id;
+  if(!patientId){
+    const {data:newP,error}=await db.from('patients').insert({practice_id:myPractice_id,first_name:soloBookState.patient.firstName,surname:soloBookState.patient.surname,mobile_number:soloBookState.patient.mobile,email:soloBookState.patient.email||null}).select('id').single();
+    if(error){showError('We could not save the patient. Technical detail: '+error.message);btn.disabled=false;btn.textContent='Confirm booking';return;}
+    patientId=newP.id;
+  }
+  const {data:appt,error}=await db.from('appointments').insert({
+    practice_id:myPractice_id,location_id:myLocationId,practitioner_id:myPractitionerId,patient_id:patientId,
+    appointment_date:soloBookState.dateStr,appointment_time:soloBookState.time,status:'booked',reason:$('#solo-book-reason').value.trim()||null
+  }).select('id').single();
+  if(error){showError(error.code==='23505'?'That time was just taken. Please choose another time.':'We could not save the appointment. Technical detail: '+error.message);btn.disabled=false;btn.textContent='Confirm booking';return;}
+  await db.from('appointment_timeline').insert({appointment_id:appt.id,event_text:'Booked by practitioner'});
+  btn.textContent='Booked';
+  announce('Appointment booked for '+soloBookState.patient.name+', '+soloBookState.dateLabel+' at '+soloBookState.time+'.');
+  setTimeout(async()=>{showScreen('screen-schedule');await loadSchedule();},300);
+});
+
+function confirmSoloCancel(patientName){
+  const area=$('#action-area'); area.innerHTML='';
+  const box=document.createElement('div'); box.className='confirm-dialog'; box.setAttribute('role','alertdialog'); box.setAttribute('aria-label','Confirm cancellation');
+  const p=document.createElement('p'); p.textContent='Cancel '+patientName+'\'s appointment?';
+  const row=document.createElement('div'); row.className='action-row';
+  const yes=document.createElement('button'); yes.type='button'; yes.className='danger'; yes.textContent='Yes, cancel it';
+  const no=document.createElement('button'); no.type='button'; no.textContent='No, keep it';
+  yes.addEventListener('click',async()=>{area.innerHTML='';await updateStatus('cancelled','Appointment cancelled');});
+  no.addEventListener('click',()=>{area.innerHTML='';renderDetail();});
+  row.append(yes,no); box.append(p,row); area.appendChild(box); p.tabIndex=-1;p.focus();
+}
+function confirmSoloNoShow(patientName){
+  const area=$('#action-area'); area.innerHTML='';
+  const box=document.createElement('div'); box.className='confirm-dialog'; box.setAttribute('role','alertdialog'); box.setAttribute('aria-label','Confirm no show');
+  const p=document.createElement('p'); p.textContent='Mark '+patientName+' as a no show?';
+  const row=document.createElement('div'); row.className='action-row';
+  const yes=document.createElement('button'); yes.type='button'; yes.className='danger'; yes.textContent='Yes, mark as no show';
+  const no=document.createElement('button'); no.type='button'; no.textContent='No, keep it';
+  yes.addEventListener('click',async()=>{area.innerHTML='';await updateStatus('no-show','Marked as no show');});
+  no.addEventListener('click',()=>{area.innerHTML='';renderDetail();});
+  row.append(yes,no); box.append(p,row); area.appendChild(box); p.tabIndex=-1;p.focus();
+}
+
 async function openDetail(apptId){
   currentApptId = apptId;
   showScreen('screen-detail');
@@ -452,6 +652,12 @@ async function renderDetail(){
   }
   if(a.status === 'with-practitioner'){
     addAction(area, 'Complete consultation', () => updateStatus('completed', 'Marked as completed'));
+  }
+  if((a.status === 'booked' || a.status === 'arrived') && !hasReceptionStaff){
+    addAction(area, 'Cancel appointment', () => confirmSoloCancel(patientName), true);
+  }
+  if((a.status === 'booked' || a.status === 'arrived') && !hasReceptionStaff){
+    addAction(area, 'Mark as no show', () => confirmSoloNoShow(patientName), true);
   }
   if(a.status === 'booked' && !soloMode && !receptionUnavailable){
     const p = document.createElement('p');
