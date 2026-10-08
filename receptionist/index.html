@@ -412,6 +412,9 @@
     <h3>Stepped away</h3>
     <div id="queue-stepped-away"></div>
 
+    <h3>Left</h3>
+    <div id="queue-left"></div>
+
     <div id="queue-override-area"></div>
   </section>
 
@@ -602,7 +605,7 @@ async function loadToday(){
 
   let query = db
     .from('appointments')
-    .select('id, appointment_time, status, reason, patients(first_name, surname, email, mobile_number), practitioners(name), locations(name)')
+    .select('id, appointment_time, status, reason, is_emergency, patients(first_name, surname, email, mobile_number), practitioners(name), locations(name)')
     .eq('practice_id', staffPracticeId)
     .eq('appointment_date', todayStr);
   if(staffLocationId) query = query.eq('location_id', staffLocationId);
@@ -686,10 +689,12 @@ function renderToday(){
     } else {
       const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
       const locationName = a.locations ? a.locations.name : '';
+      const emergencyTag = a.is_emergency ? '<span class="status with-practitioner">Emergency / Walk-in</span>' : '';
       card.innerHTML =
         '<span class="time">' + time + '</span> — ' +
         '<span class="who">' + patientName + ', with ' + practitionerName + '</span>' +
         '<span class="loc">' + locationName + '</span>' +
+        emergencyTag +
         '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
       card.addEventListener('click', () => openDetail(a.id, 'today'));
     }
@@ -779,8 +784,35 @@ async function updateStatus(newStatus, eventText){
     return;
   }
   await db.from('appointment_timeline').insert({ appointment_id: currentApptId, event_text: eventText });
+  await syncQueueFromAppointment(currentApptId, newStatus);
   await renderDetail();
   announce(eventText + '.');
+}
+
+// Keeps a linked queue entry in step when the appointment itself changes
+// status (e.g. completing or cancelling from Today's Schedule rather than
+// from the Queue screen). Only touches a queue entry that is still active.
+async function syncQueueFromAppointment(appointmentId, newStatus){
+  const queueStatusMap = {
+    'with-practitioner': 'with_practitioner',
+    'completed': 'completed',
+    'cancelled': 'left',
+    'no-show': 'left'
+  };
+  const mappedStatus = queueStatusMap[newStatus];
+  if(!mappedStatus) return;
+
+  const { data: queueRow } = await db
+    .from('queue_entries').select('id, status')
+    .eq('appointment_id', appointmentId)
+    .not('status', 'in', '(completed,left)')
+    .maybeSingle();
+  if(!queueRow) return;
+
+  const payload = { status: mappedStatus };
+  if(mappedStatus === 'with_practitioner') payload.with_practitioner_at = new Date().toISOString();
+  if(mappedStatus === 'completed') payload.completed_at = new Date().toISOString();
+  await db.from('queue_entries').update(payload).eq('id', queueRow.id);
 }
 
 async function notifyPractitionerOfCancellation(appt, patientName){
@@ -2081,17 +2113,35 @@ $('#wq-checkin-btn').addEventListener('click', async () => {
   const tokenHash = await sha256Hex(rawToken);
   const today = new Date();
   const expiresAt = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+  const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
 
-  const { error } = await db.from('queue_entries').insert({
-    practice_id: staffPracticeId,
-    location_id: wqState.locationId,
-    practitioner_id: null,
-    appointment_id: null,
-    patient_id: patientId,
-    is_walk_in: true,
-    token_hash: tokenHash,
-    expires_at: expiresAt.toISOString()
-  });
+  // If this same patient already has a "left" walk-in entry from earlier
+  // today, reactivate it (at the back of the line) rather than creating a
+  // second, separate entry for the same visit.
+  const { data: earlierEntry } = await db
+    .from('queue_entries').select('id')
+    .eq('patient_id', patientId).eq('practice_id', staffPracticeId).eq('location_id', wqState.locationId)
+    .eq('is_walk_in', true).eq('status', 'left')
+    .gte('checked_in_at', dayStart)
+    .order('checked_in_at', { ascending: false }).limit(1).maybeSingle();
+
+  let error;
+  if(earlierEntry){
+    ({ error } = await db.from('queue_entries')
+      .update({ status: 'waiting', checked_in_at: new Date().toISOString(), token_hash: tokenHash, expires_at: expiresAt.toISOString() })
+      .eq('id', earlierEntry.id));
+  } else {
+    ({ error } = await db.from('queue_entries').insert({
+      practice_id: staffPracticeId,
+      location_id: wqState.locationId,
+      practitioner_id: null,
+      appointment_id: null,
+      patient_id: patientId,
+      is_walk_in: true,
+      token_hash: tokenHash,
+      expires_at: expiresAt.toISOString()
+    }));
+  }
 
   btn.disabled = false; btn.textContent = 'Add to queue';
 
@@ -2105,9 +2155,9 @@ $('#wq-checkin-btn').addEventListener('click', async () => {
   }
 
   showScreen('screen-wq-done');
-  $('#wq-done-text').textContent = wqState.patient.name + ' has been added to the waiting queue.';
+  $('#wq-done-text').textContent = wqState.patient.name + (earlierEntry ? ' has been checked back in to the queue.' : ' has been added to the waiting queue.');
   $('#wq-done-link').textContent = 'Share this link with the patient: ' + QUEUE_STATUS_BASE_URL + '/?token=' + rawToken;
-  announce(wqState.patient.name + ' added to the queue. A queue status link has been created.');
+  announce(wqState.patient.name + (earlierEntry ? ' checked back in.' : ' added to the queue.') + ' A queue status link has been created.');
 });
 
 // QUEUE
@@ -2115,7 +2165,7 @@ $('#queue-nav-btn').addEventListener('click', () => { showScreen('screen-queue')
 
 async function loadQueue(){
   clearError();
-  ['queue-with-practitioner','queue-called','queue-waiting','queue-stepped-away'].forEach(id => {
+  ['queue-with-practitioner','queue-called','queue-waiting','queue-stepped-away','queue-left'].forEach(id => {
     $('#' + id).innerHTML = '<p class="loading-text">Loading...</p>';
   });
   $('#queue-override-area').innerHTML = '';
@@ -2124,7 +2174,7 @@ async function loadQueue(){
     .from('queue_entries')
     .select('id, status, is_walk_in, checked_in_at, appointment_id, patient_id, patients(first_name, surname), appointments(appointment_time)')
     .eq('practice_id', staffPracticeId)
-    .in('status', ['waiting', 'called', 'with_practitioner', 'stepped_away']);
+    .in('status', ['waiting', 'called', 'with_practitioner', 'stepped_away', 'left']);
   if(staffLocationId) query = query.eq('location_id', staffLocationId);
   const { data, error } = await query;
 
@@ -2155,12 +2205,14 @@ function renderQueue(){
   const called = entries.filter(e => e.status === 'called');
   const waiting = entries.filter(e => e.status === 'waiting').sort((a,b) => a.sortKey - b.sortKey);
   const steppedAway = entries.filter(e => e.status === 'stepped_away');
+  const left = entries.filter(e => e.status === 'left');
   const calculatedNextId = waiting.length > 0 ? waiting[0].id : null;
 
   renderQueueSection('queue-with-practitioner', withPractitioner, 'No one currently with a practitioner.');
   renderQueueSection('queue-called', called, 'No one has been called yet.');
   renderQueueSection('queue-waiting', waiting, 'No one waiting right now.', calculatedNextId);
   renderQueueSection('queue-stepped-away', steppedAway, 'No one has stepped away.');
+  renderQueueSection('queue-left', left, 'No one has left the queue today.');
 }
 
 function queueEntryLabel(e){
@@ -2199,6 +2251,8 @@ function renderQueueSection(containerId, list, emptyText, calculatedNextId){
       addQueueSmallAction(row, 'Complete', () => completeQueueEntry(e));
     } else if(e.status === 'stepped_away'){
       addQueueSmallAction(row, 'Returned — back to waiting', () => updateQueueStatus(e, 'waiting'));
+    } else if(e.status === 'left'){
+      addQueueSmallAction(row, 'Check back in', () => checkBackIn(e));
     }
     card.appendChild(row);
     wrap.appendChild(card);
@@ -2280,6 +2334,28 @@ async function completeQueueEntry(entry){
   }
 }
 
+// A patient who left the queue checks back in from here. Walk-ins go to
+// the back of the line (their position is based on check-in time, so this
+// resets it); booked patients keep their original appointment-time
+// priority, which never changes regardless of when they check back in.
+async function checkBackIn(entry){
+  clearError();
+  const payload = { status: 'waiting' };
+  if(entry.is_walk_in) payload.checked_in_at = new Date().toISOString();
+
+  const { error } = await db.from('queue_entries').update(payload).eq('id', entry.id);
+  if(error){
+    showError('We could not check this patient back in right now. Technical detail: ' + error.message);
+    return;
+  }
+  if(entry.appointment_id){
+    await db.from('appointments').update({ status: 'arrived' }).eq('id', entry.appointment_id);
+    await db.from('appointment_timeline').insert({ appointment_id: entry.appointment_id, event_text: 'Checked back in via queue' });
+  }
+  announce(entry.patientName + ' has been checked back in.');
+  await loadQueue();
+}
+
 async function updateQueueStatus(entry, newStatus, extraFields){
   clearError();
   const payload = Object.assign({ status: newStatus }, extraFields || {});
@@ -2287,6 +2363,10 @@ async function updateQueueStatus(entry, newStatus, extraFields){
   if(error){
     showError('We could not update this queue entry right now. Technical detail: ' + error.message);
     return;
+  }
+  if(newStatus === 'left' && entry.appointment_id){
+    await db.from('appointments').update({ status: 'booked' }).eq('id', entry.appointment_id);
+    await db.from('appointment_timeline').insert({ appointment_id: entry.appointment_id, event_text: 'Left the queue — appointment returned to Booked' });
   }
   announce(entry.patientName + ' is now ' + newStatus.replace('_', ' ') + '.');
   await loadQueue();
