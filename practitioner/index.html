@@ -244,6 +244,23 @@ function statusLabel(s){
 }
 function formatTime(t){ return t.slice(0,5); }
 
+const SLOT_MINUTES = 30;
+function generateSlots(startTime, endTime, dateObj, isToday, durationMinutes){
+  const duration = durationMinutes || SLOT_MINUTES;
+  const slots = [];
+  let [h, m] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  const now = new Date();
+  while(h < endH || (h === endH && m < endM)){
+    if(!isToday || h > now.getHours() || (h === now.getHours() && m > now.getMinutes())){
+      slots.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+    }
+    m += duration;
+    if(m >= 60){ m -= 60; h += 1; }
+  }
+  return slots;
+}
+
 function showScreen(id){
   document.querySelectorAll('main > section').forEach(s => s.hidden = true);
   const el = document.getElementById(id);
