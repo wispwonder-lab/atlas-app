@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Practitioner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --primary:#2563EB; --primary-dark:#1d4ed8; --secondary:#14B8A6;
+    --success:#16A34A; --success-bg:#e9f8ee;
+    --warning:#F59E0B; --warning-bg:#fef6e7;
+    --error:#DC2626; --error-bg:#fdecec;
+    --info:#3B82F6; --info-bg:#eaf1fe;
+    --bg:#F8FAFC; --surface:#FFFFFF; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0;
+    --radius:12px; --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; font-size:16px; }
+  .wrap{ max-width:640px; margin:0 auto; padding:var(--s3) var(--s2) 60px; }
+  header.brand{ padding:var(--s3) var(--s2); background:var(--surface); border-bottom:1px solid var(--border); margin-bottom:var(--s2); display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  header.brand .eyebrow{ font-size:14px; color:var(--text-muted); margin:0 0 2px; font-weight:500; }
+  header.brand h1{ margin:0; font-size:22px; font-weight:700; }
+  h2{ font-size:20px; font-weight:700; margin:0 0 4px; }
+  h3{ font-size:16px; font-weight:600; margin:var(--s2) 0 var(--s1); }
+  p.instruction{ color:var(--text-muted); margin-top:0; }
+  label{ display:block; font-weight:600; margin-bottom:6px; font-size:15px; }
+  input[type=text], input[type=password]{
+    width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px;
+  }
+  .field{ margin-bottom:var(--s2); }
+  .error-banner{ background:var(--error-bg); border:1px solid #f5b5b5; color:var(--error); padding:var(--s1) var(--s2); border-radius:var(--radius); margin-bottom:var(--s2); font-weight:600; }
+  button:focus-visible, a:focus-visible, input:focus-visible{ outline:3px solid var(--primary); outline-offset:2px; }
+  button.primary{
+    width:100%; min-height:44px; padding:12px var(--s2); font-size:16px; font-weight:600; font-family:inherit;
+    background:var(--primary); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; margin-top:var(--s1);
+  }
+  button.primary:hover{ background:var(--primary-dark); }
+  button.primary:disabled{ background:#93A6C9; cursor:not-allowed; }
+  button.logout-btn, .back-btn{
+    background:none; border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:var(--radius);
+    font-size:14px; font-family:inherit; cursor:pointer; min-height:40px;
+  }
+  .back-btn{ display:block; margin-top:var(--s2); }
+  a.forgot-link{ display:inline-block; margin-top:var(--s2); color:var(--primary); font-size:14px; }
+  .toggle-row[hidden]{ display:none; }
+  .toggle-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:var(--s2); padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin:var(--s2) 0; }
+  .toggle-row .label-group{ font-weight:600; font-size:15px; display:block; }
+  .toggle-row .sub{ display:block; font-weight:400; color:var(--text-muted); font-size:13px; margin-top:2px; }
+  .toggle-btn{ min-height:40px; padding:8px 16px; border-radius:var(--radius); border:2px solid var(--primary); background:#fff; color:var(--primary); font-weight:700; font-family:inherit; cursor:pointer; flex-shrink:0; }
+  .toggle-btn[aria-pressed="true"]{ background:var(--primary); color:#fff; }
+  .reception-banner{ background:var(--warning-bg); border:1px solid #f3d9a8; border-radius:var(--radius); padding:var(--s2); margin-bottom:var(--s2); }
+  .reception-banner p{ margin:0 0 var(--s1); font-weight:600; color:#92400e; }
+  .reception-activate-btn{ width:100%; min-height:44px; padding:10px; border:1px dashed var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text-muted); font-family:inherit; font-size:14px; cursor:pointer; margin-bottom:var(--s2); }
+  .focus-card{ background:var(--info-bg); border:1px solid #c7dafc; border-radius:var(--radius); padding:var(--s2); margin-bottom:var(--s2); }
+  .focus-card .eyebrow-label{ font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--primary-dark); margin:0; }
+  .focus-card .patient-name{ font-size:20px; font-weight:700; margin:4px 0 0; }
+  .focus-card .meta{ color:var(--text-muted); margin:2px 0 var(--s1); }
+  .focus-card .reason-tag{ display:inline-block; background:#fff; border:1px solid #c7dafc; border-radius:999px; padding:2px 10px; font-size:13px; margin-bottom:var(--s1); }
+  .empty-focus{ text-align:center; padding:var(--s3) var(--s2); color:var(--text-muted); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:var(--s2); }
+  .extra-role-box{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); margin-top:var(--s2); }
+  .extra-role-box h3{ margin-top:0; }
+  .extra-role-box p{ margin:0; color:var(--text-muted); font-size:15px; }
+  ul.appt-list{ list-style:none; padding:0; margin:0; }
+  ul.appt-list li{ margin-bottom:var(--s1); }
+  .appt-card{
+    width:100%; text-align:left; padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--surface); font-size:16px; font-family:inherit; color:var(--text); cursor:pointer;
+  }
+  .appt-card .time{ font-weight:700; }
+  .appt-card .who{ display:block; margin-top:2px; }
+  .appt-card .status{ display:inline-block; margin-top:6px; font-size:13px; font-weight:700; padding:2px 10px; border-radius:12px; }
+  .status.booked{ background:var(--info-bg); color:var(--primary-dark); }
+  .status.arrived{ background:var(--warning-bg); color:#92400e; }
+  .status.with-practitioner{ background:#ede9fe; color:#6d28d9; }
+  .status.completed{ background:var(--success-bg); color:#15803d; }
+  .status.cancelled{ background:var(--error-bg); color:#b91c1c; }
+  .status.no-show{ background:#f1f5f9; color:var(--text-muted); }
+  .no-appts{ color:var(--text-muted); padding:var(--s2) 0; }
+  .loading-text{ color:var(--text-muted); padding:var(--s2) 0; }
+  dl.detail-list{ margin:var(--s2) 0; }
+  dl.detail-list dt{ font-weight:600; font-size:14px; color:var(--text-muted); margin-top:var(--s1); }
+  dl.detail-list dd{ margin:0; font-size:16px; }
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<header class="brand">
+  <div>
+    <p class="eyebrow" id="brand-eyebrow">Atlas — Practitioner</p>
+    <h1 id="page-title">Sign In</h1>
+  </div>
+  <button type="button" class="logout-btn" id="logout-btn" hidden>Log out</button>
+</header>
+
+<main class="wrap">
+  <div aria-live="polite" class="visually-hidden" id="live-region"></div>
+  <div id="error-area"></div>
+
+  <!-- LOGIN -->
+  <section id="screen-login">
+    <h2 id="login-heading" tabindex="-1">Welcome back</h2>
+    <p class="instruction">Sign in with your Atlas staff account.</p>
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="text" id="login-email" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="primary" id="login-btn">Sign in</button>
+    </form>
+    <a href="#" class="forgot-link" id="forgot-link">Forgot password?</a>
+  </section>
+
+  <!-- HOME: MY SCHEDULE -->
+  <section id="screen-schedule" hidden>
+    <h2 id="schedule-heading" tabindex="-1">My Schedule</h2>
+    <p class="instruction" id="schedule-subheading"></p>
+
+    <div id="reception-override-area"></div>
+
+    <div class="toggle-row" id="solo-toggle-row">
+      <span class="label-group">Working without reception today<span class="sub">Lets you mark patients as arrived yourself</span></span>
+      <button type="button" class="toggle-btn" id="solo-toggle" aria-pressed="false">Off</button>
+    </div>
+
+    <div class="toggle-row">
+      <span class="label-group">Notify me on this device<span class="sub">Get alerted here if a cancellation or other change happens while you're away from the app</span></span>
+      <button type="button" class="toggle-btn" id="notify-toggle" aria-pressed="false">Off</button>
+    </div>
+
+    <div id="focus-area"></div>
+
+    <h3>Today's appointments</h3>
+    <ul class="appt-list" id="appt-list"></ul>
+
+    <div id="extra-roles-area"></div>
+  </section>
+
+  <!-- APPOINTMENT DETAIL -->
+  <section id="screen-detail" hidden>
+    <h2 id="detail-heading" tabindex="-1">Appointment</h2>
+    <dl class="detail-list" id="detail-box"></dl>
+    <div id="action-area"></div>
+    <button type="button" class="back-btn" id="detail-back">Back to My Schedule</button>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (sel) => document.querySelector(sel);
+const live = $('#live-region');
+
+let myPractitionerId = null;
+let myPractitionerName = null;
+let myPractice_id = null;
+let soloMode = false;
+let receptionUnavailable = false;
+let hasReceptionStaff = true;
+let currentApptId = null;
+let todaysAppointments = [];
+
+function announce(msg){
+  live.textContent = '';
+  setTimeout(() => {
+    live.textContent = msg;
+    setTimeout(() => { live.textContent = ''; }, 4000);
+  }, 30);
+}
+function showError(msg){
+  $('#error-area').innerHTML = '<div class="error-banner">' + msg + '</div>';
+  announce(msg);
+}
+function clearError(){ $('#error-area').innerHTML = ''; }
+
+function formatDateISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+function formatDateLabel(d){
+  return d.toLocaleDateString('en-ZA', { weekday:'long', day:'2-digit', month:'long' });
+}
+function statusLabel(s){
+  const labels = { booked:'Booked', arrived:'Arrived', 'with-practitioner':'With Practitioner', completed:'Completed', cancelled:'Cancelled', 'no-show':'No Show' };
+  return labels[s] || s;
+}
+function formatTime(t){ return t.slice(0,5); }
+
+function showScreen(id){
+  document.querySelectorAll('main > section').forEach(s => s.hidden = true);
+  const el = document.getElementById(id);
+  el.hidden = false;
+  clearError();
+  const heading = el.querySelector('h2');
+  if(heading){ heading.setAttribute('tabindex','-1'); heading.focus(); }
+}
+
+async function checkExistingSession(){
+  const { data: { session } } = await db.auth.getSession();
+  if(session) await handleLoggedIn(session.user);
+}
+
+async function handleLoggedIn(user){
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, role, is_active, practice_id, practitioner_id, works_alone_by_default')
+    .eq('user_id', user.id).eq('role', 'practitioner').maybeSingle();
+
+  if(roleErr || !roleRow){
+    showError('We could not find a practitioner account linked to this login. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+  if(!roleRow.is_active){
+    showError('Your account is inactive. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+  if(roleRow.role !== 'practitioner' || !roleRow.practitioner_id){
+    showError('This account is not set up as a practitioner. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+
+  myPractitionerId = roleRow.practitioner_id;
+  myPractitionerName = roleRow.full_name;
+  myPractice_id = roleRow.practice_id;
+  soloMode = !!roleRow.works_alone_by_default;
+  $('#solo-toggle').setAttribute('aria-pressed', String(soloMode));
+  $('#solo-toggle').textContent = soloMode ? 'On' : 'Off';
+
+  const { data: practiceRow } = await db
+    .from('practices').select('has_reception_staff').eq('id', myPractice_id).maybeSingle();
+  hasReceptionStaff = practiceRow ? practiceRow.has_reception_staff !== false : true;
+  $('#solo-toggle-row').hidden = !hasReceptionStaff;
+  if(!hasReceptionStaff){ soloMode = true; }
+
+  $('#brand-eyebrow').textContent = 'Atlas — Practitioner';
+  $('#page-title').textContent = 'Hi, ' + roleRow.full_name.split(' ')[0];
+  $('#logout-btn').hidden = false;
+
+  await renderExtraRoles(user.id);
+  await checkNotificationStatus();
+
+  showScreen('screen-schedule');
+  await loadSchedule();
+}
+
+async function renderExtraRoles(userId){
+  const area = $('#extra-roles-area');
+  area.innerHTML = '';
+
+  const { data: allRoles } = await db
+    .from('staff_roles').select('role, is_active')
+    .eq('user_id', userId).eq('practice_id', myPractice_id);
+
+  if(!allRoles) return;
+  const activeExtraRoles = allRoles.filter(r => r.is_active && r.role !== 'practitioner').map(r => r.role);
+
+  if(activeExtraRoles.includes('receptionist')){
+    const box = document.createElement('div'); box.className = 'extra-role-box';
+    box.innerHTML = '<h3>Receptionist Tools</h3><p>You also have Receptionist access. Open the Receptionist page and sign in with these same details to use it.</p>';
+    area.appendChild(box);
+  }
+  if(activeExtraRoles.includes('practice_administrator')){
+    const box = document.createElement('div'); box.className = 'extra-role-box';
+    box.innerHTML = '<h3>Practice Administration</h3><p>You also have Practice Administrator access. Open the Practice Administrator page and sign in with these same details to use it.</p>';
+    area.appendChild(box);
+  }
+}
+
+async function loadSchedule(){
+  clearError();
+  const today = new Date();
+  $('#schedule-subheading').textContent = formatDateLabel(today) + ', ' + myPractitionerName;
+  $('#appt-list').innerHTML = '<li class="loading-text">Loading today\'s schedule...</li>';
+  $('#focus-area').innerHTML = '';
+
+  const { data, error } = await db
+    .from('appointments')
+    .select('id, appointment_time, status, reason, patients(first_name, surname)')
+    .eq('practitioner_id', myPractitionerId)
+    .eq('appointment_date', formatDateISO(today))
+    .neq('status', 'cancelled')
+    .order('appointment_time', { ascending: true });
+
+  if(error){
+    showError('We could not load your schedule right now. Technical detail: ' + error.message);
+    $('#appt-list').innerHTML = '';
+    return;
+  }
+
+  todaysAppointments = data || [];
+  renderReceptionOverride();
+  renderFocusArea();
+  renderApptList();
+}
+
+function renderReceptionOverride(){
+  const area = $('#reception-override-area');
+  area.innerHTML = '';
+  if(!hasReceptionStaff) return;
+  if(receptionUnavailable){
+    const box = document.createElement('div');
+    box.className = 'reception-banner';
+    box.setAttribute('role', 'status');
+    box.innerHTML = '<p>Reception is currently unavailable. You can check patients in yourself for now.</p>';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'toggle-btn';
+    btn.textContent = 'Reception is back';
+    btn.addEventListener('click', () => {
+      receptionUnavailable = false;
+      renderReceptionOverride();
+      announce('Reception is back. Self check-in is no longer needed.');
+      if(!$('#screen-detail').hidden) renderDetail();
+    });
+    box.appendChild(btn);
+    area.appendChild(box);
+  } else {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'reception-activate-btn';
+    btn.textContent = 'Reception stepped away? Tap here to check patients in yourself';
+    btn.addEventListener('click', () => {
+      receptionUnavailable = true;
+      renderReceptionOverride();
+      announce('Reception marked unavailable. You can now check patients in yourself until you turn this off.');
+      if(!$('#screen-detail').hidden) renderDetail();
+    });
+    area.appendChild(btn);
+  }
+}
+
+function renderFocusArea(){
+  const focusArea = $('#focus-area');
+  focusArea.innerHTML = '';
+  const withPractitioner = todaysAppointments.find(a => a.status === 'with-practitioner');
+  const nextUp = todaysAppointments
+    .filter(a => a.status === 'booked' || a.status === 'arrived')
+    .sort((x,y) => x.appointment_time.localeCompare(y.appointment_time))[0];
+
+  const focusAppt = withPractitioner || nextUp;
+  if(focusAppt){
+    const label = withPractitioner ? 'Current patient' : 'Next patient';
+    const patientName = focusAppt.patients ? (focusAppt.patients.first_name + ' ' + focusAppt.patients.surname) : 'Unknown patient';
+    const card = document.createElement('div');
+    card.className = 'focus-card';
+    card.innerHTML =
+      '<p class="eyebrow-label">' + label + '</p>' +
+      '<p class="patient-name">' + patientName + '</p>' +
+      '<p class="meta">' + formatTime(focusAppt.appointment_time) + ' — ' + statusLabel(focusAppt.status) + '</p>' +
+      (focusAppt.reason ? '<span class="reason-tag">' + focusAppt.reason + '</span>' : '');
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'primary'; btn.textContent = 'View details';
+    btn.addEventListener('click', () => openDetail(focusAppt.id));
+    card.appendChild(btn);
+    focusArea.appendChild(card);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'empty-focus';
+    empty.textContent = "You're all caught up for now.";
+    focusArea.appendChild(empty);
+  }
+}
+
+function renderApptList(){
+  const list = $('#appt-list');
+  list.innerHTML = '';
+  if(todaysAppointments.length === 0){
+    const p = document.createElement('p'); p.className = 'no-appts'; p.textContent = 'No appointments today.';
+    list.appendChild(p);
+    return;
+  }
+  todaysAppointments.forEach(a => {
+    const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+    const li = document.createElement('li');
+    const card = document.createElement('button');
+    card.type = 'button'; card.className = 'appt-card';
+    card.innerHTML =
+      '<span class="time">' + formatTime(a.appointment_time) + '</span> — ' +
+      '<span class="who">' + patientName + '</span>' +
+      '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    card.addEventListener('click', () => openDetail(a.id));
+    li.appendChild(card);
+    list.appendChild(li);
+  });
+}
+
+$('#solo-toggle').addEventListener('click', async () => {
+  soloMode = !soloMode;
+  $('#solo-toggle').setAttribute('aria-pressed', String(soloMode));
+  $('#solo-toggle').textContent = soloMode ? 'On' : 'Off';
+  announce(soloMode ? 'Working without reception. You can now mark patients as arrived yourself.' : 'Reception is handling check-ins today.');
+  if(!$('#screen-detail').hidden) renderDetail();
+
+  const { error: saveErr } = await db
+    .from('staff_roles').update({ works_alone_by_default: soloMode }).eq('user_id', (await db.auth.getUser()).data.user.id);
+  if(saveErr){
+    showError('Your choice is active now, but we could not save it for next time. Technical detail: ' + saveErr.message);
+  }
+});
+
+async function openDetail(apptId){
+  currentApptId = apptId;
+  showScreen('screen-detail');
+  await renderDetail();
+}
+
+async function renderDetail(){
+  const { data: a, error } = await db
+    .from('appointments')
+    .select('appointment_time, status, reason, patients(first_name, surname)')
+    .eq('id', currentApptId).single();
+
+  if(error || !a){
+    showError('We could not load this appointment right now.' + (error ? ' Technical detail: ' + error.message : ''));
+    return;
+  }
+
+  const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+  $('#detail-heading').textContent = patientName + ' — ' + formatTime(a.appointment_time);
+
+  const dl = $('#detail-box');
+  dl.innerHTML = '';
+  [
+    ['Patient name', patientName],
+    ['Time', formatTime(a.appointment_time)],
+    ['Reason for visit', a.reason || 'Not provided'],
+    ['Status', statusLabel(a.status)]
+  ].forEach(([t,d]) => {
+    const dt = document.createElement('dt'); dt.textContent = t;
+    const dd = document.createElement('dd'); dd.textContent = d;
+    dl.appendChild(dt); dl.appendChild(dd);
+  });
+
+  const area = $('#action-area');
+  area.innerHTML = '';
+  if(a.status === 'booked' && (soloMode || receptionUnavailable)){
+    addAction(area, 'Mark as arrived', () => updateStatus('arrived', 'Marked as arrived'));
+  }
+  if(a.status === 'arrived'){
+    addAction(area, 'Start consultation', () => updateStatus('with-practitioner', 'Marked as with practitioner'));
+  }
+  if(a.status === 'with-practitioner'){
+    addAction(area, 'Complete consultation', () => updateStatus('completed', 'Marked as completed'));
+  }
+  if(a.status === 'booked' && !soloMode && !receptionUnavailable){
+    const p = document.createElement('p');
+    p.className = 'instruction';
+    p.textContent = 'Reception will check this patient in when they arrive.';
+    area.appendChild(p);
+  }
+}
+
+function addAction(area, label, fn){
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'primary'; btn.textContent = label;
+  btn.addEventListener('click', fn);
+  area.appendChild(btn);
+}
+
+async function updateStatus(newStatus, eventText){
+  clearError();
+  const { error: updateErr } = await db
+    .from('appointments').update({ status: newStatus }).eq('id', currentApptId);
+  if(updateErr){
+    showError('We could not update this appointment right now. Technical detail: ' + updateErr.message);
+    return;
+  }
+  await db.from('appointment_timeline').insert({ appointment_id: currentApptId, event_text: eventText });
+  await syncQueueFromAppointment(currentApptId, newStatus);
+  await renderDetail();
+  announce(eventText + '.');
+}
+
+// Keeps a linked queue entry in step when the appointment itself changes
+// status from the Practitioner page. Only touches a queue entry that is
+// still active.
+async function syncQueueFromAppointment(appointmentId, newStatus){
+  const queueStatusMap = {
+    'with-practitioner': 'with_practitioner',
+    'completed': 'completed'
+  };
+  const mappedStatus = queueStatusMap[newStatus];
+  if(!mappedStatus) return;
+
+  const { data: queueRow } = await db
+    .from('queue_entries').select('id, status')
+    .eq('appointment_id', appointmentId)
+    .not('status', 'in', '(completed,left)')
+    .maybeSingle();
+  if(!queueRow) return;
+
+  const payload = { status: mappedStatus };
+  if(mappedStatus === 'with_practitioner') payload.with_practitioner_at = new Date().toISOString();
+  if(mappedStatus === 'completed') payload.completed_at = new Date().toISOString();
+  await db.from('queue_entries').update(payload).eq('id', queueRow.id);
+}
+
+$('#detail-back').addEventListener('click', async () => {
+  showScreen('screen-schedule');
+  await loadSchedule();
+});
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if(!email || !password){
+    showError('Please enter both your email and password.');
+    return;
+  }
+  const btn = $('#login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false; btn.textContent = 'Sign in';
+
+  if(error){
+    showError("We couldn't sign you in. Please check your email and password and try again.");
+    return;
+  }
+  await handleLoggedIn(data.user);
+});
+
+$('#forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  showError("Forgot password isn't connected yet — please contact your practice administrator for now.");
+});
+
+$('#logout-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  myPractitionerId = null; myPractitionerName = null; myPractice_id = null;
+  soloMode = false; receptionUnavailable = false; hasReceptionStaff = true;
+  $('#solo-toggle-row').hidden = false;
+  $('#solo-toggle').setAttribute('aria-pressed', 'false');
+  $('#solo-toggle').textContent = 'Off';
+  $('#notify-toggle').setAttribute('aria-pressed', 'false');
+  $('#notify-toggle').textContent = 'Off';
+  $('#extra-roles-area').innerHTML = '';
+  $('#logout-btn').hidden = true;
+  $('#brand-eyebrow').textContent = 'Atlas — Practitioner';
+  $('#page-title').textContent = 'Sign In';
+  $('#login-form').reset();
+  clearError();
+  showScreen('screen-login');
+  announce('You have been signed out.');
+});
+
+const VAPID_PUBLIC_KEY = 'BHSMvNNjdlgzE6fgm7V9x2ofluK5qbyXh5UY-JRexbpwDwIaDKJg5vUA28Fljcf9CYyI2LGZjwXmGqBJ-lkTCsU';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; i++){ outputArray[i] = rawData.charCodeAt(i); }
+  return outputArray;
+}
+
+async function checkNotificationStatus(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if(!reg) return;
+    const existingSub = await reg.pushManager.getSubscription();
+    if(existingSub){
+      $('#notify-toggle').setAttribute('aria-pressed', 'true');
+      $('#notify-toggle').textContent = 'On';
+    }
+  } catch(e) { /* silently ignore — not critical to login */ }
+}
+
+$('#notify-toggle').addEventListener('click', async () => {
+  const btn = $('#notify-toggle');
+  const currentlyOn = btn.getAttribute('aria-pressed') === 'true';
+  clearError();
+
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    showError('Notifications are not supported on this device or browser.');
+    return;
+  }
+
+  if(!currentlyOn){
+    try{
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      const permission = await Notification.requestPermission();
+      if(permission !== 'granted'){
+        showError('Notifications were not allowed. You can turn this on later from your device settings.');
+        return;
+      }
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      const subJson = subscription.toJSON();
+      const { data: userData } = await db.auth.getUser();
+      const { error } = await db.from('push_subscriptions').insert({
+        user_id: userData.user.id,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth_key: subJson.keys.auth
+      });
+      if(error){
+        showError('We could not save your notification settings right now. Technical detail: ' + error.message);
+        return;
+      }
+      btn.setAttribute('aria-pressed', 'true');
+      btn.textContent = 'On';
+      announce('Notifications turned on for this device.');
+    } catch(e){
+      showError('We could not turn on notifications right now. Technical detail: ' + e.message);
+    }
+  } else {
+    try{
+      const reg = await navigator.serviceWorker.getRegistration();
+      const existingSub = reg ? await reg.pushManager.getSubscription() : null;
+      if(existingSub){
+        await db.from('push_subscriptions').delete().eq('endpoint', existingSub.endpoint);
+        await existingSub.unsubscribe();
+      }
+      btn.setAttribute('aria-pressed', 'false');
+      btn.textContent = 'Off';
+      announce('Notifications turned off for this device.');
+    } catch(e){
+      showError('We could not turn off notifications right now. Technical detail: ' + e.message);
+    }
+  }
+});
+
+checkExistingSession();
+</script>
+</body>
+</html>
