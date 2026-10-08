@@ -594,7 +594,7 @@ $('#notify-toggle').addEventListener('click', async () => {
 
   if(!currentlyOn){
     try{
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      const reg = await navigator.serviceWorker.register('/practitioner/sw.js');
       const permission = await Notification.requestPermission();
       if(permission !== 'granted'){
         showError('Notifications were not allowed. You can turn this on later from your device settings.');
