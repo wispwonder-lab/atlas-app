@@ -30,6 +30,13 @@
   input[type=text], input[type=password]{
     width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px;
   }
+  input[type=search]{ width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px; }
+  .search-result{ border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); margin-bottom:var(--s1); background:var(--surface); }
+  .search-result .patient-name{ font-weight:700; display:block; }
+  .search-result .patient-contact{ color:var(--text-muted); font-size:14px; display:block; margin-bottom:var(--s1); }
+  .summary-line{ background:var(--info-bg); border:1px solid #c7dafc; border-radius:var(--radius); padding:var(--s1) var(--s2); margin-bottom:var(--s2); font-weight:600; color:var(--primary-dark); font-size:15px; }
+  button.small-btn{ background:var(--surface); border:1px solid var(--border); color:var(--primary-dark); padding:8px 14px; border-radius:var(--radius); font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; min-height:40px; }
+  .error-text{ color:var(--error); font-size:14px; margin-top:6px; font-weight:600; }
   .field{ margin-bottom:var(--s2); }
   .error-banner{ background:var(--error-bg); border:1px solid #f5b5b5; color:var(--error); padding:var(--s1) var(--s2); border-radius:var(--radius); margin-bottom:var(--s2); font-weight:600; }
   button:focus-visible, a:focus-visible, input:focus-visible{ outline:3px solid var(--primary); outline-offset:2px; }
@@ -520,7 +527,6 @@ $('#solo-toggle').addEventListener('click', async () => {
 
 let bookState = {};
 
-$('#book-nav-btn').addEventListener('click', () => { bookState = {}; openSoloBookFlow(); });
 $('#book-practitioner-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
 $('#book-slot-back').addEventListener('click', async () => { showScreen('screen-schedule'); await loadSchedule(); });
 $('#book-patient-back').addEventListener('click', () => { showScreen('screen-book-slot'); });
