@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Atlas Administrator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --primary:#2563EB; --primary-dark:#1d4ed8; --secondary:#14B8A6;
+    --success:#16A34A; --success-bg:#e9f8ee;
+    --warning:#F59E0B; --warning-bg:#fef6e7;
+    --error:#DC2626; --error-bg:#fdecec;
+    --info:#3B82F6; --info-bg:#eaf1fe;
+    --bg:#F8FAFC; --surface:#FFFFFF; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0;
+    --radius:12px; --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; font-size:16px; }
+  .wrap{ max-width:640px; margin:0 auto; padding:var(--s3) var(--s2) 60px; }
+  header.brand{ padding:var(--s3) var(--s2); background:var(--surface); border-bottom:1px solid var(--border); margin-bottom:var(--s2); display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  header.brand .eyebrow{ font-size:14px; color:var(--text-muted); margin:0 0 2px; font-weight:500; }
+  header.brand h1{ margin:0; font-size:22px; font-weight:700; }
+  h2{ font-size:20px; font-weight:700; margin:0 0 4px; }
+  h3{ font-size:16px; font-weight:600; margin:var(--s2) 0 var(--s1); }
+  p.instruction{ color:var(--text-muted); margin-top:0; }
+  label{ display:block; font-weight:600; margin-bottom:6px; font-size:15px; }
+  input[type=text], input[type=password]{
+    width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px;
+  }
+  .field{ margin-bottom:var(--s2); }
+  .error-banner{ background:var(--error-bg); border:1px solid #f5b5b5; color:var(--error); padding:var(--s1) var(--s2); border-radius:var(--radius); margin-bottom:var(--s2); font-weight:600; }
+  button:focus-visible, a:focus-visible, input:focus-visible{ outline:3px solid var(--primary); outline-offset:2px; }
+  button.primary{
+    width:100%; min-height:44px; padding:12px var(--s2); font-size:16px; font-weight:600; font-family:inherit;
+    background:var(--primary); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; margin-top:var(--s1);
+  }
+  button.primary:hover{ background:var(--primary-dark); }
+  button.primary:disabled{ background:#93A6C9; cursor:not-allowed; }
+  button.logout-btn{
+    background:none; border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:var(--radius);
+    font-size:14px; font-family:inherit; cursor:pointer; min-height:40px; flex-shrink:0;
+  }
+  button.small-btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--primary-dark); padding:8px 14px;
+    border-radius:var(--radius); font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; min-height:40px;
+  }
+  #main-nav[hidden]{ display:none; }
+  #main-nav{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--s3); padding-bottom:var(--s2); border-bottom:1px solid var(--border); }
+  .summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:var(--s2) 0; }
+  .summary-card{ border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); background:var(--surface); text-align:center; }
+  .summary-card .num{ display:block; font-size:26px; font-weight:700; }
+  .summary-card .label{ display:block; font-size:13px; color:var(--text-muted); margin-top:2px; }
+  .qr-box{ text-align:center; margin:var(--s2) 0; }
+  .qr-box img{ max-width:220px; border:1px solid var(--border); border-radius:var(--radius); }
+  .secret-text{ font-family:monospace; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--s1) var(--s2); word-break:break-all; font-size:14px; margin:var(--s1) 0; }
+  dl.detail-box{ margin:var(--s2) 0; }
+  dl.detail-box dt{ font-weight:600; font-size:14px; color:var(--text-muted); margin-top:var(--s1); }
+  dl.detail-box dd{ margin:0; font-size:16px; }
+  .item-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--s2); padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-bottom:var(--s1); cursor:pointer; width:100%; text-align:left; font-family:inherit; font-size:16px; }
+  .item-row .name{ font-weight:700; display:block; }
+  .item-row .status-tag{ display:block; font-size:14px; margin-top:2px; }
+  .status-tag.active{ color:#15803d; }
+  .status-tag.suspended{ color:#b91c1c; }
+  .no-results{ color:var(--text-muted); padding:var(--s2) 0; }
+  .loading-text{ color:var(--text-muted); padding:var(--s2) 0; }
+  .confirm-dialog{ background:var(--warning-bg); border:1px solid #f3d9a8; border-radius:var(--radius); padding:var(--s2); margin:var(--s2) 0; }
+  .confirm-dialog p{ margin:0 0 var(--s1); font-weight:600; }
+  .confirm-dialog .note{ font-weight:400; color:#92400e; font-size:14px; }
+  .action-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .action-row button{ min-height:44px; padding:10px 16px; border-radius:var(--radius); font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; background:var(--primary); color:#fff; border:none; }
+  .action-row button.secondary{ background:#fff; color:var(--text); border:1px solid var(--border); }
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<header class="brand">
+  <div>
+    <p class="eyebrow" id="brand-eyebrow">Atlas — Atlas Administrator</p>
+    <h1 id="page-title">Sign In</h1>
+  </div>
+  <button type="button" class="logout-btn" id="logout-btn" hidden>Log out</button>
+</header>
+
+<main class="wrap">
+  <div aria-live="polite" class="visually-hidden" id="live-region"></div>
+  <div id="error-area"></div>
+
+  <nav id="main-nav" hidden aria-label="Quick navigation">
+    <button type="button" class="small-btn" id="overview-nav-btn">Overview</button>
+    <button type="button" class="small-btn" id="clinics-nav-btn">Clinics</button>
+  </nav>
+
+  <!-- LOGIN -->
+  <section id="screen-login">
+    <h2 id="login-heading" tabindex="-1">Welcome back</h2>
+    <p class="instruction">Sign in with your Atlas administrator account.</p>
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="text" id="login-email" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="primary" id="login-btn">Sign in</button>
+    </form>
+  </section>
+
+  <!-- MFA ENROLL (first time only) -->
+  <section id="screen-mfa-enroll" hidden>
+    <h2 id="mfa-enroll-heading" tabindex="-1">Set up your authenticator</h2>
+    <p class="instruction">Atlas Administrator accounts require a second verification step. Scan this code with an authenticator app (like Google Authenticator or Authy), or enter the text code manually.</p>
+    <div class="qr-box"><img id="mfa-qr-img" alt="QR code for authenticator app setup"></div>
+    <p class="instruction">Or enter this code manually:</p>
+    <div class="secret-text" id="mfa-secret-text"></div>
+    <form id="mfa-enroll-form" novalidate>
+      <div class="field">
+        <label for="mfa-enroll-code">Enter the 6-digit code from your app</label>
+        <input type="text" id="mfa-enroll-code" autocomplete="one-time-code" inputmode="numeric">
+      </div>
+      <button type="submit" class="primary" id="mfa-enroll-btn">Verify and finish setup</button>
+    </form>
+  </section>
+
+  <!-- MFA CHALLENGE (returning login) -->
+  <section id="screen-mfa-challenge" hidden>
+    <h2 id="mfa-challenge-heading" tabindex="-1">Verify it's you</h2>
+    <p class="instruction">Enter the 6-digit code from your authenticator app.</p>
+    <form id="mfa-challenge-form" novalidate>
+      <div class="field">
+        <label for="mfa-challenge-code">Authentication code</label>
+        <input type="text" id="mfa-challenge-code" autocomplete="one-time-code" inputmode="numeric">
+      </div>
+      <button type="submit" class="primary" id="mfa-challenge-btn">Verify</button>
+    </form>
+  </section>
+
+  <!-- PLATFORM OVERVIEW -->
+  <section id="screen-overview" hidden>
+    <h2 id="overview-heading" tabindex="-1">Platform Overview</h2>
+    <div class="summary-grid" id="overview-grid"></div>
+    <h3>Recent activity</h3>
+    <p class="instruction">Not tracked yet — a platform-wide admin activity log is a planned future feature.</p>
+  </section>
+
+  <!-- CLINICS -->
+  <section id="screen-clinics" hidden>
+    <h2 id="clinics-heading" tabindex="-1">Clinics</h2>
+    <div id="clinics-list"></div>
+  </section>
+
+  <!-- CLINIC DETAIL -->
+  <section id="screen-clinic-detail" hidden>
+    <h2 id="clinic-detail-heading" tabindex="-1">Clinic</h2>
+    <dl class="detail-box" id="clinic-detail-box"></dl>
+    <div class="action-row" id="clinic-action-row"></div>
+    <div id="clinic-confirm-area"></div>
+    <button type="button" class="small-btn" id="clinic-detail-back" style="margin-top:16px;">Back to Clinics</button>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (sel) => document.querySelector(sel);
+const live = $('#live-region');
+
+let pendingUser = null;
+let pendingFactorId = null;
+let pendingChallengeId = null;
+
+function announce(msg){
+  live.textContent = '';
+  setTimeout(() => {
+    live.textContent = msg;
+    setTimeout(() => { live.textContent = ''; }, 4000);
+  }, 30);
+}
+function showError(msg){
+  $('#error-area').innerHTML = '<div class="error-banner">' + msg + '</div>';
+  announce(msg);
+}
+function clearError(){ $('#error-area').innerHTML = ''; }
+
+function formatDateISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+const NAV_VISIBLE_SCREENS = ['screen-overview', 'screen-clinics'];
+
+function showScreen(id){
+  document.querySelectorAll('main > section').forEach(s => s.hidden = true);
+  const el = document.getElementById(id);
+  el.hidden = false;
+  clearError();
+  $('#main-nav').hidden = !NAV_VISIBLE_SCREENS.includes(id);
+  const heading = el.querySelector('h2');
+  if(heading){ heading.setAttribute('tabindex','-1'); heading.focus(); }
+}
+
+async function checkExistingSession(){
+  const { data: { session } } = await db.auth.getSession();
+  if(!session) return;
+
+  const { data: aalData } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(aalData && aalData.currentLevel === 'aal2'){
+    await completeLogin(session.user);
+  } else {
+    pendingUser = session.user;
+    await beginMfaFlow();
+  }
+}
+
+// LOGIN
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if(!email || !password){
+    showError('Please enter both your email and password.');
+    return;
+  }
+  const btn = $('#login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false; btn.textContent = 'Sign in';
+
+  if(error){
+    showError("We couldn't sign you in. Please check your email and password and try again.");
+    return;
+  }
+
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, role, is_active')
+    .eq('user_id', data.user.id).eq('role', 'atlas_administrator').maybeSingle();
+
+  if(roleErr || !roleRow){
+    showError('We could not find an Atlas Administrator account linked to this login.');
+    await db.auth.signOut();
+    return;
+  }
+  if(!roleRow.is_active){
+    showError('Your account is inactive.');
+    await db.auth.signOut();
+    return;
+  }
+
+  pendingUser = data.user;
+  pendingFullName = roleRow.full_name;
+  await beginMfaFlow();
+});
+
+let pendingFullName = null;
+
+// MFA
+async function beginMfaFlow(){
+  const { data: factorsData, error: factorsErr } = await db.auth.mfa.listFactors();
+  if(factorsErr){
+    showError('We could not check your authenticator setup right now. Technical detail: ' + factorsErr.message);
+    return;
+  }
+  const verifiedTotp = (factorsData.totp || []).find(f => f.status === 'verified');
+
+  if(verifiedTotp){
+    pendingFactorId = verifiedTotp.id;
+    const { data: challengeData, error: challengeErr } = await db.auth.mfa.challenge({ factorId: pendingFactorId });
+    if(challengeErr){
+      showError('We could not start verification right now. Technical detail: ' + challengeErr.message);
+      return;
+    }
+    pendingChallengeId = challengeData.id;
+    showScreen('screen-mfa-challenge');
+  } else {
+    const { data: enrollData, error: enrollErr } = await db.auth.mfa.enroll({ factorType: 'totp' });
+    if(enrollErr){
+      showError('We could not start authenticator setup right now. Technical detail: ' + enrollErr.message);
+      return;
+    }
+    pendingFactorId = enrollData.id;
+    $('#mfa-qr-img').src = enrollData.totp.qr_code;
+    $('#mfa-secret-text').textContent = enrollData.totp.secret;
+    showScreen('screen-mfa-enroll');
+  }
+}
+
+$('#mfa-enroll-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const code = $('#mfa-enroll-code').value.trim();
+  if(!code){ showError('Please enter the 6-digit code from your app.'); return; }
+
+  const btn = $('#mfa-enroll-btn');
+  btn.disabled = true; btn.textContent = 'Verifying...';
+
+  const { data: challengeData, error: challengeErr } = await db.auth.mfa.challenge({ factorId: pendingFactorId });
+  if(challengeErr){
+    btn.disabled = false; btn.textContent = 'Verify and finish setup';
+    showError('We could not verify that code right now. Technical detail: ' + challengeErr.message);
+    return;
+  }
+  const { error: verifyErr } = await db.auth.mfa.verify({
+    factorId: pendingFactorId, challengeId: challengeData.id, code
+  });
+
+  btn.disabled = false; btn.textContent = 'Verify and finish setup';
+
+  if(verifyErr){
+    showError('That code didn\'t match. Please check your authenticator app and try again.');
+    return;
+  }
+  await completeLogin(pendingUser);
+});
+
+$('#mfa-challenge-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const code = $('#mfa-challenge-code').value.trim();
+  if(!code){ showError('Please enter your authentication code.'); return; }
+
+  const btn = $('#mfa-challenge-btn');
+  btn.disabled = true; btn.textContent = 'Verifying...';
+
+  const { error: verifyErr } = await db.auth.mfa.verify({
+    factorId: pendingFactorId, challengeId: pendingChallengeId, code
+  });
+
+  btn.disabled = false; btn.textContent = 'Verify';
+
+  if(verifyErr){
+    showError('That code didn\'t match. Please try again.');
+    return;
+  }
+  await completeLogin(pendingUser);
+});
+
+async function completeLogin(user){
+  let fullName = pendingFullName;
+  if(!fullName){
+    const { data: roleRow } = await db
+      .from('staff_roles').select('full_name').eq('user_id', user.id).eq('role', 'atlas_administrator').maybeSingle();
+    fullName = roleRow ? roleRow.full_name : 'Administrator';
+  }
+  $('#brand-eyebrow').textContent = 'Atlas — Atlas Administrator';
+  $('#page-title').textContent = 'Hi, ' + fullName.split(' ')[0];
+  $('#logout-btn').hidden = false;
+
+  showScreen('screen-overview');
+  await loadOverview();
+}
+
+// OVERVIEW
+$('#overview-nav-btn').addEventListener('click', () => { showScreen('screen-overview'); loadOverview(); });
+
+async function loadOverview(){
+  clearError();
+  const grid = $('#overview-grid');
+  grid.innerHTML = '<p class="loading-text">Loading platform overview...</p>';
+
+  const { data: practices, error: prErr } = await db.from('practices').select('account_status');
+  if(prErr){ grid.innerHTML = ''; showError('We could not load the overview right now. Technical detail: ' + prErr.message); return; }
+
+  const todayStr = formatDateISO(new Date());
+  const { data: appts, error: apptErr } = await db.from('appointments').select('id').eq('appointment_date', todayStr);
+  if(apptErr){ grid.innerHTML = ''; showError('We could not load the overview right now. Technical detail: ' + apptErr.message); return; }
+
+  const total = practices.length;
+  const active = practices.filter(p => p.account_status === 'active').length;
+  const suspended = practices.filter(p => p.account_status === 'suspended').length;
+
+  grid.innerHTML = '';
+  [
+    [String(total), 'Total clinics'],
+    [String(active), 'Active'],
+    [String(suspended), 'Suspended'],
+    [String((appts || []).length), 'Appointments today, all clinics']
+  ].forEach(([num, label]) => {
+    const card = document.createElement('div'); card.className = 'summary-card';
+    card.innerHTML = '<span class="num">' + num + '</span><span class="label">' + label + '</span>';
+    grid.appendChild(card);
+  });
+}
+
+// CLINICS
+$('#clinics-nav-btn').addEventListener('click', () => { showScreen('screen-clinics'); loadClinics(); });
+
+async function loadClinics(){
+  clearError();
+  const wrap = $('#clinics-list');
+  wrap.innerHTML = '<p class="loading-text">Loading clinics...</p>';
+
+  const { data, error } = await db.from('practices').select('id, name, account_status').order('name', { ascending: true });
+
+  if(error){
+    wrap.innerHTML = '';
+    showError('We could not load clinics right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  wrap.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No clinics yet.';
+    wrap.appendChild(p);
+    return;
+  }
+  data.forEach(clinic => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'item-row';
+    const statusClass = clinic.account_status === 'suspended' ? 'suspended' : 'active';
+    const statusText = clinic.account_status === 'suspended' ? 'Suspended' : 'Active';
+    btn.innerHTML = '<span class="name">' + clinic.name + '</span><span class="status-tag ' + statusClass + '">' + statusText + '</span>';
+    btn.addEventListener('click', () => openClinicDetail(clinic.id));
+    wrap.appendChild(btn);
+  });
+}
+
+async function openClinicDetail(clinicId){
+  showScreen('screen-clinic-detail');
+  const { data: clinic, error } = await db
+    .from('practices').select('id, name, contact_phone, contact_email, account_status')
+    .eq('id', clinicId).single();
+
+  if(error || !clinic){
+    showError('We could not load this clinic right now.' + (error ? ' Technical detail: ' + error.message : ''));
+    return;
+  }
+
+  $('#clinic-detail-heading').textContent = clinic.name;
+
+  const { count: locCount } = await db.from('locations').select('id', { count: 'exact', head: true }).eq('practice_id', clinicId);
+  const { count: staffCount } = await db.from('staff_roles').select('id', { count: 'exact', head: true }).eq('practice_id', clinicId).eq('is_active', true);
+
+  const dl = $('#clinic-detail-box');
+  dl.innerHTML = '';
+  [
+    ['Clinic name', clinic.name],
+    ['Phone', clinic.contact_phone || '—'],
+    ['Email', clinic.contact_email || '—'],
+    ['Account status', clinic.account_status === 'suspended' ? 'Suspended' : 'Active'],
+    ['Locations', String(locCount || 0)],
+    ['Active staff', String(staffCount || 0)],
+    ['Billing / plan', 'Not tracked yet']
+  ].forEach(([t,d]) => {
+    const dt = document.createElement('dt'); dt.textContent = t;
+    const dd = document.createElement('dd'); dd.textContent = d;
+    dl.appendChild(dt); dl.appendChild(dd);
+  });
+
+  const actionRow = $('#clinic-action-row');
+  actionRow.innerHTML = '';
+  $('#clinic-confirm-area').innerHTML = '';
+  const actionBtn = document.createElement('button'); actionBtn.type = 'button';
+  actionBtn.textContent = clinic.account_status === 'suspended' ? 'Reactivate clinic' : 'Suspend clinic';
+  actionBtn.addEventListener('click', () => confirmClinicStatusChange(clinic));
+  actionRow.appendChild(actionBtn);
+}
+
+function confirmClinicStatusChange(clinic){
+  const area = $('#clinic-confirm-area');
+  area.innerHTML = '';
+  const suspending = clinic.account_status !== 'suspended';
+  const box = document.createElement('div'); box.className = 'confirm-dialog';
+  box.setAttribute('role', 'alertdialog');
+  const p = document.createElement('p');
+  p.textContent = suspending ? ('Suspend ' + clinic.name + '?') : ('Reactivate ' + clinic.name + '?');
+  const note = document.createElement('p'); note.className = 'note';
+  note.textContent = suspending
+    ? 'This records the clinic as suspended. Full lockout enforcement for staff at this clinic is being built as a separate next step — it is not yet active.'
+    : 'This records the clinic as active again.';
+  const rowEl = document.createElement('div'); rowEl.className = 'action-row';
+  const yesBtn = document.createElement('button'); yesBtn.type = 'button';
+  yesBtn.textContent = suspending ? 'Yes, suspend' : 'Yes, reactivate';
+  const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.className = 'secondary'; noBtn.textContent = 'Cancel';
+  yesBtn.addEventListener('click', () => { area.innerHTML = ''; changeClinicStatus(clinic, suspending); });
+  noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Cancelled. No changes made.'); });
+  rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
+  box.appendChild(p); box.appendChild(note); box.appendChild(rowEl); area.appendChild(box);
+  p.setAttribute('tabindex', '-1'); p.focus();
+}
+
+async function changeClinicStatus(clinic, suspending){
+  clearError();
+  const newStatus = suspending ? 'suspended' : 'active';
+  const { error } = await db.from('practices').update({ account_status: newStatus }).eq('id', clinic.id);
+  if(error){
+    showError('We could not update this clinic right now. Technical detail: ' + error.message);
+    return;
+  }
+  announce(clinic.name + ' is now ' + (suspending ? 'suspended.' : 'active.'));
+  await openClinicDetail(clinic.id);
+}
+
+$('#clinic-detail-back').addEventListener('click', () => { showScreen('screen-clinics'); loadClinics(); });
+
+$('#logout-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  pendingUser = null; pendingFactorId = null; pendingChallengeId = null; pendingFullName = null;
+  $('#logout-btn').hidden = true;
+  $('#brand-eyebrow').textContent = 'Atlas — Atlas Administrator';
+  $('#page-title').textContent = 'Sign In';
+  $('#login-form').reset();
+  clearError();
+  showScreen('screen-login');
+  announce('You have been signed out.');
+});
+
+checkExistingSession();
+</script>
+</body>
+</html>
