@@ -375,15 +375,21 @@ async function renderPractitionerSlots(){
   rangeEndDate.setDate(rangeEndDate.getDate() + state.slotWindowDays);
   const rangeEnd = formatDateISO(rangeEndDate);
 
-  const { data: bookedRows, error: bookedErr } = await db
-    .from('appointments').select('appointment_date, appointment_time')
-    .eq('practitioner_id', state.practitioner.id)
-    .gte('appointment_date', rangeStart)
-    .lte('appointment_date', rangeEnd)
-    .not('status', 'in', '(cancelled,no-show)');
-  if(bookedErr){ showError('We could not check availability right now. Technical detail: ' + bookedErr.message); return; }
+  const { data: bookedRows, error: bookedErr } = await db.rpc('get_public_booked_slots', {
+    p_practitioner_id: state.practitioner.id,
+    p_start_date: rangeStart,
+    p_end_date: rangeEnd
+  });
+  if(bookedErr){ showError('We could not check availability right now. Please try again shortly.'); return; }
 
-  const bookedSet = new Set((bookedRows || []).map(b => b.appointment_date + '_' + b.appointment_time.slice(0,5)));
+  const bookedByDate = {};
+  (bookedRows || []).forEach(b => {
+    if(!bookedByDate[b.appointment_date]) bookedByDate[b.appointment_date] = [];
+    bookedByDate[b.appointment_date].push({
+      start: timeToMinutes(b.appointment_time),
+      duration: Number(b.duration_minutes) || Number(state.practitioner.appointment_duration_minutes) || 30
+    });
+  });
 
   const slots = [];
   for(let i = 0; i < state.slotWindowDays; i++){
@@ -395,13 +401,21 @@ async function renderPractitionerSlots(){
     const isToday = i === 0;
     patterns.forEach(p => {
       generateSlots(p.start_time, p.end_time, d, isToday, state.practitioner.appointment_duration_minutes).forEach(t => {
-        if(!bookedSet.has(dateStr + '_' + t)) slots.push({ dateStr, dateLabel: formatDateLabel(d), time: t });
+        const start = timeToMinutes(t);
+        const end = start + (Number(state.practitioner.appointment_duration_minutes) || 30);
+        const overlaps = (bookedByDate[dateStr] || []).some(b => start < b.start + b.duration && end > b.start);
+        if(!overlaps) slots.push({ dateStr, dateLabel: formatDateLabel(d), time: t });
       });
     });
   }
 
   state.allSlots = slots;
   renderSlotList();
+}
+
+function timeToMinutes(value){
+  const parts = String(value || '').slice(0,5).split(':').map(Number);
+  return (parts[0] || 0) * 60 + (parts[1] || 0);
 }
 
 function renderSlotList(){
@@ -562,41 +576,31 @@ $('#confirm-booking-btn').addEventListener('click', async () => {
   const btn = $('#confirm-booking-btn');
   btn.disabled = true; btn.textContent = 'Booking...';
 
-  const newPatientId = crypto.randomUUID();
-  const { error: patientErr } = await db
-    .from('patients').insert({
-      id: newPatientId,
-      practice_id: state.practiceId, first_name: state.name, surname: state.surname,
-      email: state.email, mobile_number: state.mobile, date_of_birth: state.dobISO
-    });
-  if(patientErr){
-    showError('We could not save your details right now. Technical detail: ' + patientErr.message);
-    btn.disabled = false; btn.textContent = 'Confirm booking';
-    return;
-  }
+  const { data: bookingRows, error: bookingErr } = await db.rpc('create_public_booking', {
+    p_practice_id: state.practiceId,
+    p_location_id: state.location.id,
+    p_practitioner_id: state.practitioner.id,
+    p_first_name: state.name,
+    p_surname: state.surname,
+    p_email: state.email,
+    p_mobile_number: state.mobile,
+    p_date_of_birth: state.dobISO,
+    p_appointment_date: state.date.dateStr,
+    p_appointment_time: state.time,
+    p_reason: state.reason || null
+  });
 
-  const { data: appt, error: apptErr } = await db
-    .from('appointments').insert({
-      practice_id: state.practiceId, location_id: state.location.id,
-      practitioner_id: state.practitioner.id, patient_id: newPatientId,
-      appointment_date: state.date.dateStr, appointment_time: state.time,
-      reason: state.reason || null, status: 'booked'
-    }).select().single();
-
-  if(apptErr){
+  if(bookingErr || !bookingRows || !bookingRows.length){
     btn.disabled = false; btn.textContent = 'Confirm booking';
-    if(apptErr.code === '23505'){
-      await loadPractitionerSlots();
+    const conflict = bookingErr && (bookingErr.code === '23P01' || /just taken|choose another time/i.test(bookingErr.message || ''));
+    if(conflict){
+      await renderPractitionerSlots();
       showError('That time was just taken by someone else. Please choose a different time.');
     } else {
-      showError('We could not complete this booking right now. Please try again.');
+      showError('We could not complete this booking right now. Please check your details and try again.');
     }
     return;
   }
-
-  await db.from('appointment_timeline').insert({
-    appointment_id: appt.id, event_text: 'Appointment created'
-  });
 
   sendConfirmationEmail();
 
