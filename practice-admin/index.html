@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Practice Administrator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --primary:#2563EB; --primary-dark:#1d4ed8; --secondary:#14B8A6;
+    --success:#16A34A; --success-bg:#e9f8ee;
+    --warning:#F59E0B; --warning-bg:#fef6e7;
+    --error:#DC2626; --error-bg:#fdecec;
+    --info:#3B82F6; --info-bg:#eaf1fe;
+    --bg:#F8FAFC; --surface:#FFFFFF; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0;
+    --radius:12px; --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; font-size:16px; }
+  .wrap{ max-width:640px; margin:0 auto; padding:var(--s3) var(--s2) 60px; }
+  header.brand{ padding:var(--s3) var(--s2); background:var(--surface); border-bottom:1px solid var(--border); margin-bottom:var(--s2); display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  header.brand .eyebrow{ font-size:14px; color:var(--text-muted); margin:0 0 2px; font-weight:500; }
+  header.brand h1{ margin:0; font-size:22px; font-weight:700; }
+  h2{ font-size:20px; font-weight:700; margin:0 0 4px; }
+  h3{ font-size:16px; font-weight:600; margin:var(--s2) 0 var(--s1); }
+  p.instruction{ color:var(--text-muted); margin-top:0; }
+  label{ display:block; font-weight:600; margin-bottom:6px; font-size:15px; }
+  input[type=text], input[type=password]{
+    width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px;
+  }
+  select{
+    width:100%; padding:12px; font-size:16px; font-family:inherit; border:1px solid var(--border); border-radius:var(--radius); min-height:44px; background:#fff;
+  }
+  .field{ margin-bottom:var(--s2); }
+  .error-banner{ background:var(--error-bg); border:1px solid #f5b5b5; color:var(--error); padding:var(--s1) var(--s2); border-radius:var(--radius); margin-bottom:var(--s2); font-weight:600; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible{ outline:3px solid var(--primary); outline-offset:2px; }
+  button.primary{
+    width:100%; min-height:44px; padding:12px var(--s2); font-size:16px; font-weight:600; font-family:inherit;
+    background:var(--primary); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; margin-top:var(--s1);
+  }
+  button.primary:hover{ background:var(--primary-dark); }
+  button.primary:disabled{ background:#93A6C9; cursor:not-allowed; }
+  button.logout-btn{
+    background:none; border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:var(--radius);
+    font-size:14px; font-family:inherit; cursor:pointer; min-height:40px; flex-shrink:0;
+  }
+  a.forgot-link{ display:inline-block; margin-top:var(--s2); color:var(--primary); font-size:14px; }
+  button.small-btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--primary-dark); padding:8px 14px;
+    border-radius:var(--radius); font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; min-height:40px;
+  }
+  #main-nav[hidden]{ display:none; }
+  #main-nav{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--s3); padding-bottom:var(--s2); border-bottom:1px solid var(--border); }
+  .summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:var(--s2) 0; }
+  .summary-card{ border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); background:var(--surface); text-align:center; }
+  .summary-card .num{ display:block; font-size:26px; font-weight:700; }
+  .summary-card .label{ display:block; font-size:13px; color:var(--text-muted); margin-top:2px; }
+  ul.appt-list{ list-style:none; padding:0; margin:0; }
+  ul.appt-list li{ margin-bottom:var(--s1); }
+  .appt-card{ padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
+  .appt-card .time{ font-weight:700; }
+  .appt-card .loc-tag{ display:inline-block; background:var(--info-bg); color:var(--primary-dark); border-radius:999px; padding:1px 10px; font-size:12px; font-weight:700; margin-left:6px; }
+  .appt-card .who{ display:block; margin-top:2px; }
+  .appt-card .status{ display:inline-block; margin-top:6px; font-size:13px; font-weight:700; padding:2px 10px; border-radius:12px; }
+  .status.booked{ background:var(--info-bg); color:var(--primary-dark); }
+  .status.arrived{ background:var(--warning-bg); color:#92400e; }
+  .status.with-practitioner{ background:#ede9fe; color:#6d28d9; }
+  .status.completed{ background:var(--success-bg); color:#15803d; }
+  .status.cancelled{ background:var(--error-bg); color:#b91c1c; }
+  .status.no-show{ background:#f1f5f9; color:var(--text-muted); }
+  .no-results{ color:var(--text-muted); padding:var(--s2) 0; }
+  .loading-text{ color:var(--text-muted); padding:var(--s2) 0; }
+  .item-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--s2); padding:var(--s2); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-bottom:var(--s1); }
+  .item-row .name{ font-weight:700; display:block; }
+  .item-row .role{ display:block; color:var(--text-muted); font-size:14px; margin-top:2px; }
+  .top-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--s2); }
+  dl.detail-box{ margin:var(--s2) 0; }
+  dl.detail-box dt{ font-weight:600; font-size:14px; color:var(--text-muted); margin-top:var(--s1); }
+  dl.detail-box dd{ margin:0; font-size:16px; }
+  .search-result{ border:1px solid var(--border); border-radius:var(--radius); padding:var(--s2); margin-bottom:var(--s1); background:var(--surface); cursor:pointer; width:100%; text-align:left; font-family:inherit; font-size:16px; }
+  .search-result .patient-name{ font-weight:700; display:block; }
+  .search-result .patient-contact{ color:var(--text-muted); font-size:14px; }
+  .toggle-btn{ min-height:40px; padding:8px 16px; border-radius:var(--radius); border:2px solid var(--primary); background:#fff; color:var(--primary); font-weight:700; font-family:inherit; cursor:pointer; flex-shrink:0; }
+  .toggle-btn[aria-pressed="true"]{ background:var(--primary); color:#fff; }
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<header class="brand">
+  <div>
+    <p class="eyebrow" id="brand-eyebrow">Atlas — Practice Administrator</p>
+    <h1 id="page-title">Sign In</h1>
+  </div>
+  <button type="button" class="logout-btn" id="logout-btn" hidden>Log out</button>
+</header>
+
+<main class="wrap">
+  <div aria-live="polite" class="visually-hidden" id="live-region"></div>
+  <div id="error-area"></div>
+
+  <nav id="main-nav" hidden aria-label="Quick navigation">
+    <button type="button" class="small-btn" id="dashboard-nav-btn">Dashboard</button>
+    <button type="button" class="small-btn" id="users-nav-btn">Users &amp; Roles</button>
+    <button type="button" class="small-btn" id="patients-nav-btn">Patients</button>
+    <button type="button" class="small-btn" id="practitioners-nav-btn">Practitioners</button>
+    <button type="button" class="small-btn" id="locations-nav-btn">Locations</button>
+    <button type="button" class="small-btn" id="settings-nav-btn">Settings</button>
+  </nav>
+
+  <!-- LOGIN -->
+  <section id="screen-login">
+    <h2 id="login-heading" tabindex="-1">Welcome back</h2>
+    <p class="instruction">Sign in with your Atlas staff account.</p>
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="text" id="login-email" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="primary" id="login-btn">Sign in</button>
+    </form>
+    <a href="#" class="forgot-link" id="forgot-link">Forgot password?</a>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="screen-dashboard" hidden>
+    <h2 id="dashboard-heading" tabindex="-1">Dashboard</h2>
+    <div class="field">
+      <label for="location-filter">Location</label>
+      <select id="location-filter"></select>
+    </div>
+    <div class="summary-grid" id="summary-grid"></div>
+    <h3>Today's appointments</h3>
+    <ul class="appt-list" id="dashboard-appt-list"></ul>
+  </section>
+
+  <!-- USERS & ROLES -->
+  <section id="screen-users" hidden>
+    <div class="top-row">
+      <h2 id="users-heading" tabindex="-1">Users &amp; Roles</h2>
+      <button type="button" class="small-btn" id="show-inactive-toggle" aria-pressed="false">Show inactive</button>
+    </div>
+    <div id="staff-items"></div>
+  </section>
+
+  <!-- PATIENTS -->
+  <section id="screen-patients" hidden>
+    <h2 id="patients-heading" tabindex="-1">Patients</h2>
+    <p class="instruction">Search by name or mobile number.</p>
+    <div class="field">
+      <label for="patient-search-input" class="visually-hidden">Search patients</label>
+      <input type="search" id="patient-search-input" placeholder="Start typing a name or number...">
+    </div>
+    <div id="patient-search-results"></div>
+  </section>
+
+  <!-- PATIENT DETAIL -->
+  <section id="screen-patient-detail" hidden>
+    <h2 id="patient-detail-heading" tabindex="-1">Patient</h2>
+    <dl class="detail-box" id="patient-detail-box"></dl>
+    <h3>Appointment history</h3>
+    <ul class="appt-list" id="patient-history-list"></ul>
+    <button type="button" class="small-btn" id="patient-detail-back">Back to Patients</button>
+  </section>
+
+  <!-- PRACTITIONERS -->
+  <section id="screen-practitioners" hidden>
+    <h2 id="practitioners-heading" tabindex="-1">Practitioners</h2>
+    <div id="practitioner-items"></div>
+    <button type="button" class="small-btn" id="add-practitioner-btn">Add practitioner</button>
+  </section>
+
+  <!-- PRACTICE LOCATIONS -->
+  <section id="screen-locations" hidden>
+    <h2 id="locations-heading" tabindex="-1">Practice Locations</h2>
+    <div id="locations-list"></div>
+    <button type="button" class="small-btn" id="add-location-btn">Add location</button>
+  </section>
+
+  <!-- PRACTICE SETTINGS -->
+  <section id="screen-settings" hidden>
+    <h2 id="settings-heading" tabindex="-1">Practice Settings</h2>
+
+    <h3>Practice details</h3>
+    <form id="settings-form" novalidate>
+      <div class="field">
+        <label for="settings-name">Practice name</label>
+        <input type="text" id="settings-name">
+      </div>
+      <div class="field">
+        <label for="settings-phone">Practice phone number</label>
+        <input type="text" id="settings-phone">
+      </div>
+      <div class="field">
+        <label for="settings-email">Practice email</label>
+        <input type="text" id="settings-email">
+      </div>
+      <button type="submit" class="primary">Save practice details</button>
+    </form>
+
+    <h3>Staffing</h3>
+    <div class="item-row">
+      <span class="name">Has reception staff<span style="display:block;font-weight:400;color:var(--text-muted);font-size:13px;margin-top:2px;">Turns off solo/reception controls on the Practitioner page when this practice has no reception at all</span></span>
+      <button type="button" class="toggle-btn" id="reception-staff-toggle" aria-pressed="true">On</button>
+    </div>
+
+    <h3>Appointment types &amp; durations</h3>
+    <p class="instruction">Not yet connected — every appointment currently uses one standard length. Configurable appointment types are a planned future improvement.</p>
+
+    <h3>Confirmation methods</h3>
+    <div class="item-row">
+      <span class="name">Email confirmations</span>
+      <span class="instruction" style="margin:0;">Not connected yet</span>
+    </div>
+    <div class="item-row">
+      <span class="name">WhatsApp confirmations</span>
+      <span class="instruction" style="margin:0;">Not connected yet</span>
+    </div>
+    <div class="item-row">
+      <span class="name">SMS confirmations</span>
+      <span class="instruction" style="margin:0;">Not connected yet</span>
+    </div>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (sel) => document.querySelector(sel);
+const live = $('#live-region');
+
+let myPracticeId = null;
+let showInactiveStaff = false;
+let staffPeople = [];
+
+function announce(msg){
+  live.textContent = '';
+  setTimeout(() => {
+    live.textContent = msg;
+    setTimeout(() => { live.textContent = ''; }, 4000);
+  }, 30);
+}
+function showError(msg){
+  $('#error-area').innerHTML = '<div class="error-banner">' + msg + '</div>';
+  announce(msg);
+}
+function clearError(){ $('#error-area').innerHTML = ''; }
+
+function formatDateISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+function statusLabel(s){
+  const labels = { booked:'Booked', arrived:'Arrived', 'with-practitioner':'With Practitioner', completed:'Completed', cancelled:'Cancelled', 'no-show':'No Show' };
+  return labels[s] || s;
+}
+function formatTime(t){ return t.slice(0,5); }
+function roleLabel(r){
+  const labels = { receptionist:'Receptionist', practitioner:'Practitioner', practice_administrator:'Practice Administrator', atlas_administrator:'Atlas Administrator' };
+  return labels[r] || r;
+}
+
+const NAV_VISIBLE_SCREENS = ['screen-dashboard', 'screen-users', 'screen-patients', 'screen-practitioners', 'screen-locations', 'screen-settings'];
+
+function showScreen(id){
+  document.querySelectorAll('main > section').forEach(s => s.hidden = true);
+  const el = document.getElementById(id);
+  el.hidden = false;
+  clearError();
+  $('#main-nav').hidden = !NAV_VISIBLE_SCREENS.includes(id);
+  const heading = el.querySelector('h2');
+  if(heading){ heading.setAttribute('tabindex','-1'); heading.focus(); }
+}
+
+async function checkExistingSession(){
+  const { data: { session } } = await db.auth.getSession();
+  if(session) await handleLoggedIn(session.user);
+}
+
+async function handleLoggedIn(user){
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, role, is_active, practice_id')
+    .eq('user_id', user.id).eq('role', 'practice_administrator').maybeSingle();
+
+  if(roleErr || !roleRow){
+    showError('We could not find a practice administrator account linked to this login. Technical detail: ' + (roleErr ? roleErr.message : 'no matching role row found') + ' Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+  if(!roleRow.is_active){
+    showError('Your account is inactive. Please contact your practice administrator.');
+    await db.auth.signOut();
+    return;
+  }
+
+  myPracticeId = roleRow.practice_id;
+  $('#brand-eyebrow').textContent = 'Atlas — Practice Administrator';
+  $('#page-title').textContent = 'Hi, ' + roleRow.full_name.split(' ')[0];
+  $('#logout-btn').hidden = false;
+
+  showScreen('screen-dashboard');
+  await loadDashboard();
+}
+
+$('#dashboard-nav-btn').addEventListener('click', () => { showScreen('screen-dashboard'); loadDashboard(); });
+$('#users-nav-btn').addEventListener('click', () => { showScreen('screen-users'); loadUsers(); });
+
+// DASHBOARD
+async function loadDashboard(){
+  clearError();
+  $('#dashboard-appt-list').innerHTML = '<li class="loading-text">Loading dashboard...</li>';
+
+  const { data: locations, error: locErr } = await db
+    .from('locations').select('id, name').eq('practice_id', myPracticeId).eq('is_active', true);
+  if(locErr){ showError('We could not load locations right now. Technical detail: ' + locErr.message); return; }
+
+  const select = $('#location-filter');
+  const previousValue = select.value;
+  select.innerHTML = '<option value="all">All Locations</option>';
+  (locations || []).forEach(loc => {
+    const opt = document.createElement('option'); opt.value = loc.id; opt.textContent = loc.name;
+    select.appendChild(opt);
+  });
+  if(previousValue) select.value = previousValue;
+  select.onchange = () => renderDashboard(locations || []);
+
+  const todayStr = formatDateISO(new Date());
+  const { data: appts, error: apptErr } = await db
+    .from('appointments')
+    .select('appointment_time, status, location_id, patients(first_name, surname), practitioners(name), locations(name)')
+    .eq('practice_id', myPracticeId)
+    .eq('appointment_date', todayStr);
+  if(apptErr){ showError('We could not load today\'s appointments right now. Technical detail: ' + apptErr.message); return; }
+
+  window.__dashboardAppts = appts || [];
+  renderDashboard(locations || []);
+}
+
+function renderDashboard(locations){
+  const filterValue = $('#location-filter').value || 'all';
+  const heading = $('#dashboard-heading');
+  const allAppts = window.__dashboardAppts || [];
+  const filtered = filterValue === 'all' ? allAppts : allAppts.filter(a => a.location_id === filterValue);
+
+  if(filterValue === 'all'){
+    heading.textContent = 'Dashboard — All Locations';
+  } else {
+    const loc = locations.find(l => l.id === filterValue);
+    heading.textContent = 'Dashboard — ' + (loc ? loc.name : '');
+  }
+
+  const grid = $('#summary-grid');
+  grid.innerHTML = '';
+  const cancelled = filtered.filter(a => a.status === 'cancelled').length;
+
+  const cards = [];
+  if(filterValue === 'all'){
+    cards.push([String(allAppts.length), 'Appointments today, all locations']);
+    locations.forEach(loc => {
+      cards.push([String(allAppts.filter(a => a.location_id === loc.id).length), loc.name]);
+    });
+    cards.push([String(cancelled), 'Cancelled today']);
+  } else {
+    cards.push([String(filtered.length), 'Appointments today']);
+    cards.push([String(cancelled), 'Cancelled today']);
+  }
+  cards.forEach(([num, label]) => {
+    const card = document.createElement('div'); card.className = 'summary-card';
+    card.innerHTML = '<span class="num">' + num + '</span><span class="label">' + label + '</span>';
+    grid.appendChild(card);
+  });
+
+  const list = $('#dashboard-appt-list');
+  list.innerHTML = '';
+  const sorted = [...filtered].sort((a,b) => a.appointment_time.localeCompare(b.appointment_time));
+  if(sorted.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No appointments for this selection today.';
+    list.appendChild(p);
+    return;
+  }
+  sorted.forEach(a => {
+    const patientName = a.patients ? (a.patients.first_name + ' ' + a.patients.surname) : 'Unknown patient';
+    const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+    const locationName = a.locations ? a.locations.name : '';
+    const li = document.createElement('li');
+    const card = document.createElement('div'); card.className = 'appt-card';
+    card.innerHTML =
+      '<span class="time">' + formatTime(a.appointment_time) + '</span>' +
+      (filterValue === 'all' ? '<span class="loc-tag">' + locationName + '</span>' : '') +
+      '<span class="who">' + patientName + ', with ' + practitionerName + '</span>' +
+      '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    li.appendChild(card);
+    list.appendChild(li);
+  });
+}
+
+// USERS & ROLES
+async function loadUsers(){
+  clearError();
+  $('#staff-items').innerHTML = '<p class="loading-text">Loading staff...</p>';
+
+  const { data: locData } = await db
+    .from('locations').select('id, name').eq('practice_id', myPracticeId).eq('is_active', true);
+  window.__practiceLocations = locData || [];
+
+  const { data, error } = await db
+    .from('staff_roles')
+    .select('id, user_id, full_name, role, is_active, practitioner_id, locations(name)')
+    .eq('practice_id', myPracticeId);
+
+  if(error){
+    $('#staff-items').innerHTML = '';
+    showError('We could not load staff right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  const byUser = {};
+  (data || []).forEach(row => {
+    if(!byUser[row.user_id]){
+      byUser[row.user_id] = { userId: row.user_id, fullName: row.full_name, roles: [], active: false, locationName: row.locations ? row.locations.name : null, practitionerId: null, roleRows: {} };
+    }
+    byUser[row.user_id].roles.push(row.role);
+    byUser[row.user_id].roleRows[row.role] = { id: row.id, isActive: row.is_active };
+    if(row.is_active) byUser[row.user_id].active = true;
+    if(!byUser[row.user_id].locationName && row.locations) byUser[row.user_id].locationName = row.locations.name;
+    if(row.role === 'practitioner' && row.practitioner_id) byUser[row.user_id].practitionerId = row.practitioner_id;
+  });
+  staffPeople = Object.values(byUser);
+
+  renderUsers();
+}
+
+function renderUsers(){
+  const wrap = $('#staff-items');
+  wrap.innerHTML = '';
+  const visible = showInactiveStaff ? staffPeople : staffPeople.filter(p => p.active);
+  const inactiveCount = staffPeople.filter(p => !p.active).length;
+  $('#show-inactive-toggle').textContent = showInactiveStaff
+    ? 'Show active only'
+    : 'Show inactive' + (inactiveCount > 0 ? ' (' + inactiveCount + ')' : '');
+
+  if(visible.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No staff to show.';
+    wrap.appendChild(p);
+    return;
+  }
+
+  visible.forEach(person => {
+    const card = document.createElement('div'); card.className = 'appt-card'; card.style.marginBottom = 'var(--s1)';
+    const roleText = person.roles.map(roleLabel).join(', ');
+    const locText = person.locationName ? (' — ' + person.locationName) : ' — All locations';
+    const nameLine = document.createElement('div');
+    nameLine.innerHTML = '<span class="name" style="font-weight:700;">' + person.fullName + (person.active ? '' : ' — Inactive') + '</span><span class="role" style="display:block;color:var(--text-muted);font-size:14px;">' + roleText + locText + '</span>';
+    card.appendChild(nameLine);
+
+    const controlsRow = document.createElement('div');
+    controlsRow.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;';
+    const deactivateBtn = document.createElement('button'); deactivateBtn.className = 'small-btn'; deactivateBtn.type = 'button';
+    deactivateBtn.textContent = person.active ? 'Deactivate' : 'Reactivate';
+    deactivateBtn.addEventListener('click', () => toggleStaffActive(person));
+    controlsRow.appendChild(deactivateBtn);
+    card.appendChild(controlsRow);
+
+    const grantsRow = document.createElement('div');
+    grantsRow.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;';
+    ['receptionist', 'practice_administrator'].forEach(roleKey => {
+      const existing = person.roleRows[roleKey];
+      const isOn = existing ? existing.isActive : false;
+      const btn = document.createElement('button'); btn.className = 'toggle-btn'; btn.type = 'button';
+      btn.setAttribute('aria-pressed', String(isOn));
+      btn.textContent = roleLabel(roleKey) + ' access: ' + (isOn ? 'On' : 'Off');
+      btn.addEventListener('click', () => toggleRoleGrant(person, roleKey, existing));
+      grantsRow.appendChild(btn);
+    });
+    card.appendChild(grantsRow);
+
+    const pickerArea = document.createElement('div'); pickerArea.id = 'picker-' + person.userId;
+    card.appendChild(pickerArea);
+
+    wrap.appendChild(card);
+  });
+}
+
+async function toggleRoleGrant(person, roleKey, existing){
+  clearError();
+  const pickerArea = $('#picker-' + person.userId);
+  pickerArea.innerHTML = '';
+
+  // Turning OFF: simple, no location choice needed.
+  if(existing && existing.isActive){
+    const { error } = await db.from('staff_roles').update({ is_active: false }).eq('id', existing.id);
+    if(error){ showError('We could not update this role right now. Technical detail: ' + error.message); return; }
+    existing.isActive = false;
+    announce(person.fullName + ' no longer has ' + roleLabel(roleKey) + ' access.');
+    await loadUsers();
+    return;
+  }
+
+  // Practice Administrator is always practice-wide — no location choice needed.
+  if(roleKey === 'practice_administrator'){
+    await grantRole(person, roleKey, existing, null);
+    return;
+  }
+
+  // Receptionist needs a real location choice before granting.
+  const box = document.createElement('div');
+  box.style.cssText = 'border:1px dashed var(--border);border-radius:var(--radius);padding:var(--s2);margin-top:8px;';
+  const label = document.createElement('label');
+  label.textContent = 'Which location should this Receptionist access cover?';
+  label.style.cssText = 'font-size:14px;';
+  label.setAttribute('for', 'loc-choice-' + person.userId);
+  const select = document.createElement('select');
+  select.id = 'loc-choice-' + person.userId;
+  const allOpt = document.createElement('option'); allOpt.value = ''; allOpt.textContent = 'All Locations';
+  select.appendChild(allOpt);
+  (window.__practiceLocations || []).forEach(loc => {
+    const opt = document.createElement('option'); opt.value = loc.id; opt.textContent = loc.name;
+    select.appendChild(opt);
+  });
+  const confirmBtn = document.createElement('button'); confirmBtn.type = 'button'; confirmBtn.className = 'primary';
+  confirmBtn.textContent = 'Confirm Receptionist access';
+  confirmBtn.addEventListener('click', async () => {
+    await grantRole(person, roleKey, existing, select.value || null);
+  });
+  box.appendChild(label); box.appendChild(select); box.appendChild(confirmBtn);
+  pickerArea.appendChild(box);
+  select.focus();
+}
+
+async function grantRole(person, roleKey, existing, locationId){
+  clearError();
+  if(existing){
+    const { error } = await db.from('staff_roles').update({ is_active: true, location_id: locationId }).eq('id', existing.id);
+    if(error){ showError('We could not update this role right now. Technical detail: ' + error.message); return; }
+  } else {
+    const { error } = await db.from('staff_roles').insert({
+      user_id: person.userId, practice_id: myPracticeId, role: roleKey,
+      full_name: person.fullName, location_id: locationId
+    });
+    if(error){ showError('We could not grant this role right now. Technical detail: ' + error.message); return; }
+  }
+  announce(person.fullName + ' now has ' + roleLabel(roleKey) + ' access.');
+  await loadUsers();
+}
+
+async function toggleStaffActive(person){
+  clearError();
+  const newActive = !person.active;
+  const { error } = await db
+    .from('staff_roles').update({ is_active: newActive })
+    .eq('user_id', person.userId).eq('practice_id', myPracticeId);
+
+  if(error){
+    showError('We could not update this person right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  let practitionerNote = '';
+  if(person.practitionerId){
+    const { error: prErr } = await db
+      .from('practitioners').update({ is_active: newActive, is_available: newActive })
+      .eq('id', person.practitionerId);
+    if(prErr){
+      showError('The staff account was updated, but we could not update their booking availability. Technical detail: ' + prErr.message);
+    } else {
+      practitionerNote = newActive ? ' They will also appear for bookings again.' : ' They will no longer appear as an option for new bookings.';
+    }
+  }
+
+  person.active = newActive;
+  renderUsers();
+  announce(person.fullName + ' has been ' + (newActive ? 'reactivated.' : 'deactivated. Their history is kept, but they can no longer sign in or be assigned new work.') + practitionerNote);
+}
+
+$('#show-inactive-toggle').addEventListener('click', () => {
+  showInactiveStaff = !showInactiveStaff;
+  $('#show-inactive-toggle').setAttribute('aria-pressed', String(showInactiveStaff));
+  renderUsers();
+});
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if(!email || !password){
+    showError('Please enter both your email and password.');
+    return;
+  }
+  const btn = $('#login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false; btn.textContent = 'Sign in';
+
+  if(error){
+    showError("We couldn't sign you in. Please check your email and password and try again.");
+    return;
+  }
+  await handleLoggedIn(data.user);
+});
+
+$('#forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  showError("Forgot password isn't connected yet — please contact your practice administrator for now.");
+});
+
+$('#logout-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  myPracticeId = null;
+  showInactiveStaff = false;
+  $('#logout-btn').hidden = true;
+  $('#brand-eyebrow').textContent = 'Atlas — Practice Administrator';
+  $('#page-title').textContent = 'Sign In';
+  $('#login-form').reset();
+  clearError();
+  showScreen('screen-login');
+  announce('You have been signed out.');
+});
+
+// PATIENTS
+$('#patients-nav-btn').addEventListener('click', () => {
+  $('#patient-search-input').value = '';
+  $('#patient-search-results').innerHTML = '';
+  showScreen('screen-patients');
+});
+
+let patientSearchDebounce = null;
+$('#patient-search-input').addEventListener('input', (e) => {
+  clearTimeout(patientSearchDebounce);
+  const q = e.target.value.trim();
+  if(!q){ $('#patient-search-results').innerHTML = ''; return; }
+  patientSearchDebounce = setTimeout(() => runPatientSearch(q), 300);
+});
+
+async function runPatientSearch(q){
+  const results = $('#patient-search-results');
+  results.innerHTML = '<p class="loading-text">Searching...</p>';
+
+  const { data, error } = await db
+    .from('patients')
+    .select('id, first_name, surname, email, mobile_number, date_of_birth')
+    .eq('practice_id', myPracticeId)
+    .or('first_name.ilike.%' + q + '%,surname.ilike.%' + q + '%,mobile_number.ilike.%' + q + '%')
+    .limit(20);
+
+  if(error){
+    results.innerHTML = '';
+    showError('We could not search right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  results.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results';
+    p.textContent = 'No patients found matching "' + q + '".';
+    results.appendChild(p);
+    announce('No results found.');
+    return;
+  }
+  data.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'search-result';
+    btn.innerHTML = '<span class="patient-name">' + p.first_name + ' ' + p.surname + '</span><span class="patient-contact">' + (p.mobile_number || p.email || '—') + '</span>';
+    btn.addEventListener('click', () => openPatientDetail(p));
+    results.appendChild(btn);
+  });
+  announce(data.length + ' patient' + (data.length === 1 ? '' : 's') + ' found.');
+}
+
+async function openPatientDetail(patient){
+  showScreen('screen-patient-detail');
+  $('#patient-detail-heading').textContent = patient.first_name + ' ' + patient.surname;
+
+  const dl = $('#patient-detail-box');
+  dl.innerHTML = '';
+  const rows = [
+    ['Name', patient.first_name + ' ' + patient.surname],
+    ['Email', patient.email || '—'],
+    ['Mobile number', patient.mobile_number || '—']
+  ];
+  if(patient.date_of_birth) rows.push(['Date of birth', patient.date_of_birth]);
+  rows.forEach(([t,d]) => {
+    const dt = document.createElement('dt'); dt.textContent = t;
+    const dd = document.createElement('dd'); dd.textContent = d;
+    dl.appendChild(dt); dl.appendChild(dd);
+  });
+
+  const list = $('#patient-history-list');
+  list.innerHTML = '<li class="loading-text">Loading appointment history...</li>';
+
+  const { data, error } = await db
+    .from('appointments')
+    .select('appointment_date, appointment_time, status, practitioners(name), locations(name)')
+    .eq('patient_id', patient.id)
+    .order('appointment_date', { ascending: false })
+    .order('appointment_time', { ascending: false });
+
+  list.innerHTML = '';
+  if(error){
+    showError('We could not load this patient\'s history right now. Technical detail: ' + error.message);
+    return;
+  }
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No appointment history yet.';
+    list.appendChild(p);
+    return;
+  }
+  data.forEach(a => {
+    const practitionerName = a.practitioners ? a.practitioners.name : 'Unknown practitioner';
+    const locationName = a.locations ? a.locations.name : '';
+    const li = document.createElement('li');
+    const card = document.createElement('div'); card.className = 'appt-card';
+    card.innerHTML =
+      '<span class="time">' + a.appointment_date + ', ' + formatTime(a.appointment_time) + '</span>' +
+      '<span class="who">' + practitionerName + ', ' + locationName + '</span>' +
+      '<span class="status ' + a.status + '">' + statusLabel(a.status) + '</span>';
+    li.appendChild(card);
+    list.appendChild(li);
+  });
+}
+
+$('#patient-detail-back').addEventListener('click', () => {
+  showScreen('screen-patients');
+});
+
+// PRACTITIONERS
+$('#practitioners-nav-btn').addEventListener('click', () => { showScreen('screen-practitioners'); loadPractitioners(); });
+
+async function loadPractitioners(){
+  clearError();
+  const wrap = $('#practitioner-items');
+  wrap.innerHTML = '<p class="loading-text">Loading practitioners...</p>';
+
+  const { data, error } = await db
+    .from('practitioners')
+    .select('id, name, role, is_available, appointment_duration_minutes, locations(name)')
+    .eq('practice_id', myPracticeId).eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if(error){
+    wrap.innerHTML = '';
+    showError('We could not load practitioners right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  wrap.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No practitioners set up yet.';
+    wrap.appendChild(p);
+    return;
+  }
+  data.forEach(pr => {
+    const card = document.createElement('div'); card.className = 'appt-card'; card.style.marginBottom = 'var(--s1)';
+    const locationName = pr.locations ? pr.locations.name : 'No location set';
+    const nameLine = document.createElement('div');
+    nameLine.innerHTML = '<span class="name" style="font-weight:700;">' + pr.name + '</span><span class="role" style="display:block;color:var(--text-muted);font-size:14px;">' + pr.role + ', ' + locationName + '</span>';
+    card.appendChild(nameLine);
+
+    const controlsRow = document.createElement('div');
+    controlsRow.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;';
+
+    const btn = document.createElement('button'); btn.className = 'toggle-btn'; btn.type = 'button';
+    btn.setAttribute('aria-pressed', String(pr.is_available));
+    btn.textContent = pr.is_available ? 'Available for booking' : 'Not available';
+    btn.addEventListener('click', () => togglePractitionerAvailable(pr, btn));
+    controlsRow.appendChild(btn);
+
+    const durationLabel = document.createElement('label');
+    durationLabel.textContent = 'Appointment length';
+    durationLabel.style.cssText = 'font-size:13px;font-weight:600;margin:0;';
+    durationLabel.setAttribute('for', 'duration-' + pr.id);
+    const durationSelect = document.createElement('select');
+    durationSelect.id = 'duration-' + pr.id;
+    durationSelect.style.width = 'auto';
+    [15, 20, 30, 45, 60].forEach(mins => {
+      const opt = document.createElement('option');
+      opt.value = mins; opt.textContent = mins + ' minutes';
+      if(mins === pr.appointment_duration_minutes) opt.selected = true;
+      durationSelect.appendChild(opt);
+    });
+    durationSelect.addEventListener('change', () => updatePractitionerDuration(pr, durationSelect));
+
+    const durationWrap = document.createElement('div');
+    durationWrap.appendChild(durationLabel); durationWrap.appendChild(durationSelect);
+    controlsRow.appendChild(durationWrap);
+
+    card.appendChild(controlsRow);
+    wrap.appendChild(card);
+  });
+}
+
+async function updatePractitionerDuration(pr, select){
+  clearError();
+  const newDuration = parseInt(select.value, 10);
+  const { error } = await db
+    .from('practitioners').update({ appointment_duration_minutes: newDuration }).eq('id', pr.id);
+
+  if(error){
+    showError('We could not update this practitioner\'s appointment length right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  pr.appointment_duration_minutes = newDuration;
+  announce(pr.name + '\'s appointment length is now ' + newDuration + ' minutes.');
+}
+
+async function togglePractitionerAvailable(pr, btn){
+  clearError();
+  const newAvailable = !pr.is_available;
+  const { error } = await db
+    .from('practitioners').update({ is_available: newAvailable }).eq('id', pr.id);
+
+  if(error){
+    showError('We could not update this practitioner right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  pr.is_available = newAvailable;
+  btn.setAttribute('aria-pressed', String(newAvailable));
+  btn.textContent = newAvailable ? 'Available for booking' : 'Not available';
+  announce(pr.name + ' is now ' + (newAvailable ? 'available for booking.' : 'not available for booking.'));
+}
+
+$('#add-practitioner-btn').addEventListener('click', () => {
+  announce('In the finished version, this opens a form to add a new practitioner, their role, location and appointment length.');
+});
+
+// PRACTICE LOCATIONS
+$('#locations-nav-btn').addEventListener('click', () => { showScreen('screen-locations'); loadLocationsScreen(); });
+
+async function loadLocationsScreen(){
+  clearError();
+  const wrap = $('#locations-list');
+  wrap.innerHTML = '<p class="loading-text">Loading locations...</p>';
+
+  const { data, error } = await db
+    .from('locations').select('name, address, hours')
+    .eq('practice_id', myPracticeId).eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if(error){
+    wrap.innerHTML = '';
+    showError('We could not load locations right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  wrap.innerHTML = '';
+  if(!data || data.length === 0){
+    const p = document.createElement('p'); p.className = 'no-results'; p.textContent = 'No locations set up yet.';
+    wrap.appendChild(p);
+    return;
+  }
+  data.forEach(loc => {
+    const box = document.createElement('dl'); box.className = 'detail-box';
+    [['Location', loc.name], ['Address', loc.address || '—'], ['Hours', loc.hours || '—']].forEach(([t,d]) => {
+      const dt = document.createElement('dt'); dt.textContent = t;
+      const dd = document.createElement('dd'); dd.textContent = d;
+      box.appendChild(dt); box.appendChild(dd);
+    });
+    wrap.appendChild(box);
+  });
+}
+
+$('#add-location-btn').addEventListener('click', () => {
+  announce('In the finished version, this opens a form to add a new practice location.');
+});
+
+// PRACTICE SETTINGS
+$('#settings-nav-btn').addEventListener('click', () => { showScreen('screen-settings'); loadSettings(); });
+
+async function loadSettings(){
+  clearError();
+  const { data, error } = await db
+    .from('practices').select('name, contact_phone, contact_email, has_reception_staff')
+    .eq('id', myPracticeId).single();
+
+  if(error || !data){
+    showError('We could not load practice settings right now.' + (error ? ' Technical detail: ' + error.message : ''));
+    return;
+  }
+
+  $('#settings-name').value = data.name || '';
+  $('#settings-phone').value = data.contact_phone || '';
+  $('#settings-email').value = data.contact_email || '';
+  $('#reception-staff-toggle').setAttribute('aria-pressed', String(data.has_reception_staff));
+  $('#reception-staff-toggle').textContent = data.has_reception_staff ? 'On' : 'Off';
+}
+
+$('#settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+  const { error } = await db
+    .from('practices').update({
+      name: $('#settings-name').value.trim(),
+      contact_phone: $('#settings-phone').value.trim(),
+      contact_email: $('#settings-email').value.trim()
+    }).eq('id', myPracticeId);
+
+  if(error){
+    showError('We could not save these details right now. Technical detail: ' + error.message);
+    return;
+  }
+  announce('Practice details saved.');
+});
+
+$('#reception-staff-toggle').addEventListener('click', async () => {
+  const btn = $('#reception-staff-toggle');
+  const newValue = btn.getAttribute('aria-pressed') !== 'true';
+  const { error } = await db
+    .from('practices').update({ has_reception_staff: newValue }).eq('id', myPracticeId);
+
+  if(error){
+    showError('We could not save this setting right now. Technical detail: ' + error.message);
+    return;
+  }
+
+  btn.setAttribute('aria-pressed', String(newValue));
+  btn.textContent = newValue ? 'On' : 'Off';
+  announce('Has reception staff is now ' + (newValue ? 'on.' : 'off. Practitioners at this practice will no longer see reception/solo controls — self check-in becomes their normal way of working.'));
+});
+
+checkExistingSession();
+</script>
+</body>
+</html>
