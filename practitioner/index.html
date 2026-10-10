@@ -731,41 +731,34 @@ $('#book-confirm-btn').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Booking...';
   const reason = $('#book-reason').value.trim();
 
-  let patientId = bookState.patient.id;
-  if(!patientId){
-    const { data: newPatient, error: patientErr } = await db
-      .from('patients').insert({
-        practice_id: myPractice_id, first_name: bookState.patient.firstName, surname: bookState.patient.surname,
-        email: bookState.patient.email, mobile_number: bookState.patient.mobile
-      }).select('id').single();
-    if(patientErr){
-      showError('We could not save the patient\'s details right now. Technical detail: ' + patientErr.message);
-      btn.disabled = false; btn.textContent = 'Confirm booking';
-      return;
-    }
-    patientId = newPatient.id;
-  }
-
-  const { data: appt, error: apptErr } = await db
-    .from('appointments').insert({
-      practice_id: myPractice_id, location_id: myLocationId, practitioner_id: bookState.practitioner.id,
-      patient_id: patientId, appointment_date: bookState.dateStr, appointment_time: bookState.time,
-      status: 'booked', reason: reason || null
-    }).select('id').single();
+  const { data: bookingRows, error: bookingErr } = await db.rpc('create_staff_booking', {
+    p_practice_id: myPractice_id,
+    p_location_id: myLocationId,
+    p_practitioner_id: bookState.practitioner.id,
+    p_appointment_date: bookState.dateStr,
+    p_appointment_time: bookState.time,
+    p_patient_id: bookState.patient.id || null,
+    p_first_name: bookState.patient.id ? null : bookState.patient.firstName,
+    p_surname: bookState.patient.id ? null : bookState.patient.surname,
+    p_email: bookState.patient.id ? null : bookState.patient.email,
+    p_mobile_number: bookState.patient.id ? null : bookState.patient.mobile,
+    p_reason: reason || null,
+    p_is_emergency: false,
+    p_allow_overlap: false,
+    p_override_reason: null
+  });
 
   btn.disabled = false; btn.textContent = 'Confirm booking';
 
-  if(apptErr){
-    if(apptErr.code === '23505'){
-      showError('That time was just taken. Please choose a different time.');
+  if(bookingErr || !bookingRows || !bookingRows.length){
+    if(bookingErr && (bookingErr.code === '23P01' || /overlap|just taken/i.test(bookingErr.message || ''))){
+      showError('That time overlaps another appointment or was just taken. Please choose another time.');
       loadBookSlots();
     } else {
-      showError('We could not save this booking right now. Technical detail: ' + apptErr.message);
+      showError('We could not save this booking right now. Please check your access and the booking details.');
     }
     return;
   }
-
-  await db.from('appointment_timeline').insert({ appointment_id: appt.id, event_text: 'Booked by reception' });
 
   showScreen('screen-book-confirm');
   const text = bookState.patient.name + ' — ' + bookState.practitioner.name + ', ' + bookState.dateLabel + ' at ' + bookState.time + '.';
