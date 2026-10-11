@@ -602,27 +602,20 @@ $('#confirm-booking-btn').addEventListener('click', async () => {
     return;
   }
 
-  sendConfirmationEmail();
+  sendConfirmationEmail(bookingRows[0].appointment_id);
 
   renderConfirmation();
   showScreen('screen-confirm');
 });
 
-function sendConfirmationEmail(){
-  // Deliberately fire-and-forget: a booking that already succeeded must
-  // never be affected by an email that fails to send.
+function sendConfirmationEmail(appointmentId){
+  // The backend looks up trusted booking details and sends at most one
+  // confirmation for this appointment. Email failure never undoes the booking.
   fetch(BACKEND_BASE_URL + '/api/send-booking-confirmation', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: state.email,
-      patientName: state.name,
-      practitionerName: state.practitioner.name,
-      locationName: state.location.name,
-      dateLabel: state.date.label,
-      time: state.time
-    })
-  }).catch(() => { /* silently ignore — booking already succeeded */ });
+    body: JSON.stringify({ appointmentId })
+  }).catch(() => { /* booking already succeeded; email can be retried operationally */ });
 }
 
 function renderConfirmation(){
