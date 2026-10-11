@@ -573,7 +573,7 @@ $('#confirm-booking-btn').addEventListener('click', async () => {
 
   if(bookingErr || !bookingRows || !bookingRows.length){
     btn.disabled = false; btn.textContent = 'Confirm booking';
-    const conflict = bookingErr && (bookingErr.code === '23P01' || /just taken|choose another time/i.test(bookingErr.message || ''));
+    const conflict = bookingErr && (bookingErr.code === '23P01' || bookingErr.code === '23505' || /just taken|choose another time|unique_practitioner_slot/i.test(bookingErr.message || ''));
     if(conflict){
       await renderPractitionerSlots();
       showError('That time was just taken by someone else. Please choose a different time.');
