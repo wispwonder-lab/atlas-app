@@ -821,23 +821,21 @@ async function syncQueueFromAppointment(appointmentId, newStatus){
 }
 
 async function notifyPractitionerOfCancellation(appt, patientName){
-  if(!appt || !appt.practitioner_id) return;
+  if(!appt || !appt.id) return;
   try{
-    const { data: staffRow } = await db
-      .from('staff_roles').select('user_id')
-      .eq('practitioner_id', appt.practitioner_id).eq('role', 'practitioner').eq('is_active', true).maybeSingle();
-    if(!staffRow) return;
+    const { data: sessionData } = await db.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if(!accessToken) return;
 
     await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        practitionerUserId: staffRow.user_id,
-        title: 'Appointment cancelled',
-        body: patientName + '\'s appointment on ' + appt.appointment_date + ' at ' + formatTime(appt.appointment_time) + ' was just cancelled.'
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + accessToken
+      },
+      body: JSON.stringify({ appointmentId: appt.id })
     });
-  } catch(e){ /* silently ignore — the cancellation itself already succeeded */ }
+  } catch(e){ /* cancellation itself already succeeded */ }
 }
 
 function confirmCancel(patientName, appt){
