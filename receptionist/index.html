@@ -781,12 +781,13 @@ async function updateStatus(newStatus, eventText){
     .from('appointments').update({ status: newStatus }).eq('id', currentApptId);
   if(updateErr){
     showError('We could not update this appointment right now. Technical detail: ' + updateErr.message);
-    return;
+    return false;
   }
   await db.from('appointment_timeline').insert({ appointment_id: currentApptId, event_text: eventText });
   await syncQueueFromAppointment(currentApptId, newStatus);
   await renderDetail();
   announce(eventText + '.');
+  return true;
 }
 
 // Keeps a linked queue entry in step when the appointment itself changes
@@ -816,14 +817,17 @@ async function syncQueueFromAppointment(appointmentId, newStatus){
 }
 
 async function notifyPractitionerOfCancellation(appt, patientName){
-  if(!appt || !appt.practitioner_id) return;
+  if(!appt || !appt.practitioner_id) {
+    return { ok:false, message:'The appointment has no linked practitioner.' };
+  }
   try{
-    const { data: staffRow } = await db
+    const { data: staffRow, error: staffError } = await db
       .from('staff_roles').select('user_id')
       .eq('practitioner_id', appt.practitioner_id).eq('role', 'practitioner').eq('is_active', true).maybeSingle();
-    if(!staffRow) return;
+    if(staffError) throw new Error('Could not find the practitioner account: ' + staffError.message);
+    if(!staffRow || !staffRow.user_id) throw new Error('No active practitioner account was found for this appointment.');
 
-    await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
+    const response = await fetch(BACKEND_BASE_URL + '/api/send-practitioner-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -832,7 +836,25 @@ async function notifyPractitionerOfCancellation(appt, patientName){
         body: patientName + '\'s appointment on ' + appt.appointment_date + ' at ' + formatTime(appt.appointment_time) + ' was just cancelled.'
       })
     });
-  } catch(e){ /* silently ignore — the cancellation itself already succeeded */ }
+    let result = {};
+    try { result = await response.json(); } catch(e) {
+      throw new Error('The notification service returned an unreadable response (HTTP ' + response.status + ').');
+    }
+    if(!response.ok) {
+      const detail = result.error || result.message || ('HTTP ' + response.status);
+      throw new Error('Notification service failed: ' + detail);
+    }
+    if(!result.sent) {
+      throw new Error(result.message || (result.failed ? 'The notification service could not deliver the notification.' : 'No active push subscription was found.'));
+    }
+    if(result.failed) {
+      return { ok:true, partial:true, message:'Notification sent to ' + result.sent + ' device(s), but ' + result.failed + ' device(s) failed.' };
+    }
+    return { ok:true, sent:result.sent, message:'Practitioner notification sent.' };
+  } catch(e){
+    console.error('Atlas practitioner cancellation notification failed:', e);
+    return { ok:false, message:e.message || 'Unknown notification error.' };
+  }
 }
 
 function confirmCancel(patientName, appt){
@@ -849,8 +871,16 @@ function confirmCancel(patientName, appt){
   const noBtn = document.createElement('button'); noBtn.type = 'button'; noBtn.textContent = 'No, keep it';
   yesBtn.addEventListener('click', async () => {
     area.innerHTML = '';
-    await updateStatus('cancelled', 'Appointment cancelled');
-    notifyPractitionerOfCancellation(appt, patientName);
+    const cancelled = await updateStatus('cancelled', 'Appointment cancelled');
+    if(!cancelled) return;
+    const notification = await notifyPractitionerOfCancellation(appt, patientName);
+    if(!notification.ok){
+      showError('Appointment cancelled, but the practitioner was NOT notified. ' + notification.message);
+    } else if(notification.partial){
+      announce(notification.message);
+    } else {
+      announce('Appointment cancelled. Practitioner notification sent.');
+    }
   });
   noBtn.addEventListener('click', () => { area.innerHTML = ''; announce('Kept the appointment as is.'); });
   rowEl.appendChild(yesBtn); rowEl.appendChild(noBtn);
