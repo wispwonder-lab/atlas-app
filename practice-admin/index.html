@@ -498,7 +498,9 @@ async function toggleRoleGrant(person, roleKey, existing){
 
   // Turning OFF: simple, no location choice needed.
   if(existing && existing.isActive){
-    const { error } = await db.from('staff_roles').update({ is_active: false }).eq('id', existing.id);
+    const { error } = await db.rpc('practice_admin_update_staff_role', {
+      p_role_id: existing.id, p_is_active: false, p_location_id: existing.locationId || null
+    });
     if(error){ showError('We could not update this role right now. Technical detail: ' + error.message); return; }
     existing.isActive = false;
     announce(person.fullName + ' no longer has ' + roleLabel(roleKey) + ' access.');
@@ -540,7 +542,9 @@ async function toggleRoleGrant(person, roleKey, existing){
 async function grantRole(person, roleKey, existing, locationId){
   clearError();
   if(existing){
-    const { error } = await db.from('staff_roles').update({ is_active: true, location_id: locationId }).eq('id', existing.id);
+    const { error } = await db.rpc('practice_admin_update_staff_role', {
+      p_role_id: existing.id, p_is_active: true, p_location_id: locationId || null
+    });
     if(error){ showError('We could not update this role right now. Technical detail: ' + error.message); return; }
   } else {
     const { error } = await db.from('staff_roles').insert({
@@ -556,9 +560,9 @@ async function grantRole(person, roleKey, existing, locationId){
 async function toggleStaffActive(person){
   clearError();
   const newActive = !person.active;
-  const { error } = await db
-    .from('staff_roles').update({ is_active: newActive })
-    .eq('user_id', person.userId).eq('practice_id', myPracticeId);
+  const { error } = await db.rpc('practice_admin_set_staff_active', {
+    p_user_id: person.userId, p_practice_id: myPracticeId, p_is_active: newActive
+  });
 
   if(error){
     showError('We could not update this person right now. Technical detail: ' + error.message);
