@@ -518,8 +518,9 @@ $('#solo-toggle').addEventListener('click', async () => {
   announce(soloMode ? 'Working without reception. You can now mark patients as arrived yourself.' : 'Reception is handling check-ins today.');
   if(!$('#screen-detail').hidden) renderDetail();
 
-  const { error: saveErr } = await db
-    .from('staff_roles').update({ works_alone_by_default: soloMode }).eq('user_id', (await db.auth.getUser()).data.user.id);
+  const { error: saveErr } = await db.rpc('update_my_solo_preference', {
+    p_works_alone: soloMode
+  });
   if(saveErr){
     showError('Your choice is active now, but we could not save it for next time. Technical detail: ' + saveErr.message);
   }
