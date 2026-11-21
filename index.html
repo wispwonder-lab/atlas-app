@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1A1A40">
+<title>Atlas | Staff Sign In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<style>
+  :root{
+    color-scheme:light;
+    --navy:#1A1A40; --blue:#2563EB; --ink:#172033; --muted:#5B6475;
+    --line:#D9DEEA; --surface:#FFFFFF; --page:#F4F6FA; --danger:#B42318;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:16px/1.55 Arial,Helvetica,sans-serif}
+  .top{background:var(--navy);color:#fff;padding:22px 20px}
+  .top-inner{max-width:760px;margin:0 auto}
+  .brand{font-size:26px;font-weight:700;letter-spacing:.3px;margin:0}
+  .tagline{margin:3px 0 0;color:#E2E5F5;font-size:14px}
+  main{max-width:520px;margin:42px auto;padding:0 18px 36px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 8px 26px rgba(26,26,64,.06)}
+  h1{font-size:24px;line-height:1.25;margin:0 0 8px;color:var(--navy)}
+  .intro{margin:0 0 24px;color:var(--muted)}
+  label{display:block;font-weight:700;margin:0 0 7px}
+  .field{margin:0 0 18px}
+  input{display:block;width:100%;min-height:48px;padding:11px 12px;border:1px solid #AEB7C8;border-radius:9px;font:inherit;color:var(--ink);background:#fff}
+  input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #0B70D6;outline-offset:3px}
+  button{font:inherit;cursor:pointer}
+  .primary,.workspace{display:block;width:100%;min-height:48px;border:0;border-radius:9px;padding:11px 16px;background:var(--blue);color:#fff;font-weight:700;text-align:center}
+  .primary:disabled{opacity:.65;cursor:wait}
+  .error{margin:0 0 18px;padding:12px 14px;border:1px solid #F1B6B2;border-radius:9px;background:#FFF1F0;color:var(--danger);font-weight:600}
+  [hidden]{display:none!important}
+  .booking{display:block;margin:22px 0 0;padding:16px;border:2px solid var(--blue);border-radius:10px;color:var(--blue);font-weight:700;text-align:center;text-decoration:none}
+  .booking:hover{background:#EFF6FF}
+  .divider{border:0;border-top:1px solid var(--line);margin:22px 0}
+  .workspace-list{display:grid;gap:12px;margin-top:20px}
+  .workspace{background:var(--navy);text-decoration:none}
+  .workspace:hover{background:#29295C}
+  .secondary{display:block;width:100%;min-height:44px;margin-top:14px;padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-weight:700}
+  .small{font-size:14px;color:var(--muted);margin:18px 0 0}
+  footer{max-width:520px;margin:0 auto;padding:0 18px 28px;text-align:center;color:var(--muted);font-size:13px}
+  @media(max-width:480px){main{margin:22px auto}.panel{padding:22px 18px}.brand{font-size:23px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <p class="brand">Atlas</p>
+    <p class="tagline">Healthcare practice management</p>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <section id="login-screen">
+      <h1>Staff sign in</h1>
+      <p class="intro">Sign in with your Atlas staff email and password.</p>
+      <div id="error-area" class="error" role="alert" hidden></div>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" name="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="primary" id="sign-in-button" type="submit">Sign in</button>
+      </form>
+      <a class="booking" href="/patient-booking/">Book an appointment</a>
+      <p class="small">Patient booking is public. Patients do not need a staff login or an Atlas account.</p>
+    </section>
+
+    <section id="workspace-screen" hidden>
+      <h1 id="workspace-heading">Choose your workspace</h1>
+      <p class="intro" id="workspace-intro">This account has access to more than one Atlas workspace.</p>
+      <div id="workspace-list" class="workspace-list"></div>
+      <button type="button" class="secondary" id="sign-out-button">Sign out</button>
+    </section>
+
+    <section id="message-screen" hidden>
+      <h1 id="message-heading">Atlas sign in</h1>
+      <p class="intro" id="message-text" role="status" aria-live="polite"></p>
+      <button type="button" class="secondary" id="return-button">Return to sign in</button>
+    </section>
+  </div>
+</main>
+
+<footer>Atlas staff access</footer>
+
+<script>
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yQwm3d09oQ53pMPH9kPefA_XxGqt3rg';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const roleInfo = {
+  receptionist: { label: 'Receptionist', path: '/receptionist/' },
+  practitioner: { label: 'Practitioner', path: '/practitioner/' },
+  practice_administrator: { label: 'Practice Administrator', path: '/practice-admin/' },
+  atlas_administrator: { label: 'Atlas Administrator', path: '/atlas-admin/' }
+};
+
+const loginScreen = document.getElementById('login-screen');
+const workspaceScreen = document.getElementById('workspace-screen');
+const messageScreen = document.getElementById('message-screen');
+const errorArea = document.getElementById('error-area');
+const signInButton = document.getElementById('sign-in-button');
+
+function showError(message){
+  errorArea.textContent = message;
+  errorArea.hidden = false;
+}
+function clearError(){
+  errorArea.textContent = '';
+  errorArea.hidden = true;
+}
+function showMessage(heading, message){
+  loginScreen.hidden = true;
+  workspaceScreen.hidden = true;
+  messageScreen.hidden = false;
+  document.getElementById('message-heading').textContent = heading;
+  document.getElementById('message-text').textContent = message;
+  document.getElementById('message-heading').focus();
+}
+function showLogin(){
+  workspaceScreen.hidden = true;
+  messageScreen.hidden = true;
+  loginScreen.hidden = false;
+  clearError();
+  document.getElementById('email').focus();
+}
+function goToWorkspace(role){
+  const info = roleInfo[role];
+  if(!info) return showMessage('Access not recognized', 'This account has an unsupported Atlas role. Please contact your Atlas administrator.');
+  window.location.assign(info.path);
+}
+
+async function routeUser(user){
+  clearError();
+  const { data, error } = await db
+    .from('staff_roles')
+    .select('role, is_active')
+    .eq('user_id', user.id)
+    .eq('is_active', true);
+
+  if(error){
+    showError('We could not check your Atlas access. Please try again. ' + error.message);
+    return;
+  }
+
+  const activeRows = (data || []).filter(row => roleInfo[row.role]);
+  if(activeRows.length === 0){
+    await db.auth.signOut();
+    showError('No active Atlas staff access was found for this login. Please contact your practice administrator.');
+    return;
+  }
+
+  const roleCounts = {};
+  activeRows.forEach(row => { roleCounts[row.role] = (roleCounts[row.role] || 0) + 1; });
+  const duplicateRole = Object.keys(roleCounts).find(role => roleCounts[role] > 1);
+  if(duplicateRole){
+    await db.auth.signOut();
+    showError('This login has more than one active ' + roleInfo[duplicateRole].label + ' record. Please ask your Atlas administrator to resolve the duplicate before signing in.');
+    return;
+  }
+
+  const roles = [...new Set(activeRows.map(row => row.role))];
+  if(roles.length === 1){
+    goToWorkspace(roles[0]);
+    return;
+  }
+
+  loginScreen.hidden = true;
+  messageScreen.hidden = true;
+  workspaceScreen.hidden = false;
+  const list = document.getElementById('workspace-list');
+  list.replaceChildren();
+  roles.forEach(role => {
+    const link = document.createElement('a');
+    link.className = 'workspace';
+    link.href = roleInfo[role].path;
+    link.textContent = 'Open ' + roleInfo[role].label;
+    list.appendChild(link);
+  });
+  document.getElementById('workspace-heading').focus();
+}
+
+document.getElementById('login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  clearError();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || !password){
+    showError('Enter your email address and password.');
+    return;
+  }
+
+  signInButton.disabled = true;
+  signInButton.textContent = 'Signing in...';
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  signInButton.disabled = false;
+  signInButton.textContent = 'Sign in';
+
+  if(error){
+    showError('We could not sign you in. Check your email and password and try again.');
+    return;
+  }
+  await routeUser(data.user);
+});
+
+document.getElementById('sign-out-button').addEventListener('click', async () => {
+  await db.auth.signOut();
+  document.getElementById('login-form').reset();
+  showLogin();
+});
+
+document.getElementById('return-button').addEventListener('click', async () => {
+  await db.auth.signOut();
+  document.getElementById('login-form').reset();
+  showLogin();
+});
+
+async function checkExistingSession(){
+  const { data: { session } } = await db.auth.getSession();
+  if(session) await routeUser(session.user);
+}
+checkExistingSession();
+</script>
+</body>
+</html>
