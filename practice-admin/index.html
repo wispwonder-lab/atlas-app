@@ -430,7 +430,7 @@ async function loadUsers(){
       byUser[row.user_id] = { userId: row.user_id, fullName: row.full_name, roles: [], active: false, locationName: row.locations ? row.locations.name : null, practitionerId: null, roleRows: {} };
     }
     byUser[row.user_id].roles.push(row.role);
-    byUser[row.user_id].roleRows[row.role] = { id: row.id, isActive: row.is_active };
+    byUser[row.user_id].roleRows[row.role] = { id: row.id, isActive: row.is_active, locationId: row.location_id };
     if(row.is_active) byUser[row.user_id].active = true;
     if(!byUser[row.user_id].locationName && row.locations) byUser[row.user_id].locationName = row.locations.name;
     if(row.role === 'practitioner' && row.practitioner_id) byUser[row.user_id].practitionerId = row.practitioner_id;
