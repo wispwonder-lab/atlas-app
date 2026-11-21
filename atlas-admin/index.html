@@ -212,11 +212,28 @@ async function checkExistingSession(){
   const { data: { session } } = await db.auth.getSession();
   if(!session) return;
 
-  const { data: aalData } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, role, is_active')
+    .eq('user_id', session.user.id).eq('role', 'atlas_administrator').maybeSingle();
+
+  if(roleErr || !roleRow || !roleRow.is_active){
+    await db.auth.signOut();
+    showScreen('screen-login');
+    showError('This login does not have active Atlas Administrator access.');
+    return;
+  }
+
+  pendingUser = session.user;
+  pendingFullName = roleRow.full_name;
+
+  const { data: aalData, error: aalErr } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(aalErr){
+    showError('We could not verify your administrator security level. Please sign in again.');
+    return;
+  }
   if(aalData && aalData.currentLevel === 'aal2'){
     await completeLogin(session.user);
   } else {
-    pendingUser = session.user;
     await beginMfaFlow();
   }
 }
@@ -347,12 +364,19 @@ $('#mfa-challenge-form').addEventListener('submit', async (e) => {
 });
 
 async function completeLogin(user){
-  let fullName = pendingFullName;
-  if(!fullName){
-    const { data: roleRow } = await db
-      .from('staff_roles').select('full_name').eq('user_id', user.id).eq('role', 'atlas_administrator').maybeSingle();
-    fullName = roleRow ? roleRow.full_name : 'Administrator';
+  const { data: roleRow, error: roleErr } = await db
+    .from('staff_roles').select('full_name, is_active')
+    .eq('user_id', user.id).eq('role', 'atlas_administrator').maybeSingle();
+
+  if(roleErr || !roleRow || !roleRow.is_active){
+    await db.auth.signOut();
+    pendingUser = null; pendingFactorId = null; pendingChallengeId = null; pendingFullName = null;
+    showScreen('screen-login');
+    showError('Your Atlas Administrator access is no longer active. Please contact your Atlas administrator.');
+    return;
   }
+
+  const fullName = roleRow.full_name || pendingFullName || 'Administrator';
   $('#brand-eyebrow').textContent = 'Atlas — Atlas Administrator';
   $('#page-title').textContent = 'Hi, ' + fullName.split(' ')[0];
   $('#logout-btn').hidden = false;
