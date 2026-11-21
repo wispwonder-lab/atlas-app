@@ -571,9 +571,9 @@ async function toggleStaffActive(person){
 
   let practitionerNote = '';
   if(person.practitionerId){
-    const { error: prErr } = await db
-      .from('practitioners').update({ is_active: newActive, is_available: newActive })
-      .eq('id', person.practitionerId);
+    const { error: prErr } = await db.rpc('practice_admin_set_practitioner_status', {
+      p_practitioner_id: person.practitionerId, p_is_active: newActive
+    });
     if(prErr){
       showError('The staff account was updated, but we could not update their booking availability. Technical detail: ' + prErr.message);
     } else {
@@ -808,8 +808,9 @@ async function loadPractitioners(){
 async function updatePractitionerDuration(pr, select){
   clearError();
   const newDuration = parseInt(select.value, 10);
-  const { error } = await db
-    .from('practitioners').update({ appointment_duration_minutes: newDuration }).eq('id', pr.id);
+  const { error } = await db.rpc('practice_admin_set_practitioner_duration', {
+    p_practitioner_id: pr.id, p_duration_minutes: newDuration
+  });
 
   if(error){
     showError('We could not update this practitioner\'s appointment length right now. Technical detail: ' + error.message);
@@ -823,8 +824,9 @@ async function updatePractitionerDuration(pr, select){
 async function togglePractitionerAvailable(pr, btn){
   clearError();
   const newAvailable = !pr.is_available;
-  const { error } = await db
-    .from('practitioners').update({ is_available: newAvailable }).eq('id', pr.id);
+  const { error } = await db.rpc('practice_admin_set_practitioner_availability', {
+    p_practitioner_id: pr.id, p_is_available: newAvailable
+  });
 
   if(error){
     showError('We could not update this practitioner right now. Technical detail: ' + error.message);
