@@ -2472,7 +2472,7 @@ async function loadQueue(){
     ...e,
     // Queue order is FIFO by actual check-in time. A newly added walk-in
     // must not jump ahead of people who are already waiting.
-    sortKey: new Date(e.checked_in_at).getTime(),
+    sortKey: e.checked_in_at,
     patientName: e.patients ? (e.patients.first_name + ' ' + e.patients.surname) : 'Unknown patient'
   }));
 
@@ -2484,7 +2484,7 @@ function renderQueue(){
   const entries = window.__queueEntries || [];
   const withPractitioner = entries.filter(e => e.status === 'with_practitioner');
   const called = entries.filter(e => e.status === 'called');
-  const waiting = entries.filter(e => e.status === 'waiting').sort((a,b) => a.sortKey - b.sortKey);
+  const waiting = entries.filter(e => e.status === 'waiting').sort((a,b) => a.sortKey.localeCompare(b.sortKey) || a.id.localeCompare(b.id));
   const steppedAway = entries.filter(e => e.status === 'stepped_away');
   const left = entries.filter(e => e.status === 'left');
   const calculatedNextId = waiting.length > 0 ? waiting[0].id : null;
