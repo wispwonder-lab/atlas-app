@@ -166,6 +166,12 @@
     <h2 id="today-heading" tabindex="-1">Today's Schedule</h2>
     <p class="instruction" id="today-date"></p>
     <div class="summary-line" id="summary-line"></div>
+    <div class="stat-grid" id="live-queue-summary" aria-label="Live queue summary">
+      <div class="stat-box"><span class="stat-number" id="queue-summary-waiting">—</span><span class="stat-label">Waiting</span></div>
+      <div class="stat-box"><span class="stat-number" id="queue-summary-consulting">—</span><span class="stat-label">In consultation</span></div>
+      <div class="stat-box"><span class="stat-number" id="queue-summary-completed">—</span><span class="stat-label">Completed</span></div>
+    </div>
+    <button type="button" class="small-btn" id="queue-summary-open-btn">Open full queue</button>
 
     <div class="top-row" style="margin-top:var(--s3);">
       <h3 style="margin:0;">Appointments</h3>
@@ -691,7 +697,33 @@ async function loadToday(){
 
   todaysAppointments = [...(data || []), ...walkInEntries].sort((a,b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
   renderToday();
+  await renderLiveQueueSummary();
 }
+
+async function renderLiveQueueSummary(){
+  const { start, end } = localDayBounds();
+  let query = db.from('queue_entries').select('status')
+    .eq('practice_id', staffPracticeId)
+    .gte('checked_in_at', start).lt('checked_in_at', end)
+    .in('status', ['waiting', 'called', 'stepped_away', 'with_practitioner', 'completed']);
+  if(staffLocationId) query = query.eq('location_id', staffLocationId);
+  const { data, error } = await query;
+  if(error){
+    $('#queue-summary-waiting').textContent = '—';
+    $('#queue-summary-consulting').textContent = '—';
+    $('#queue-summary-completed').textContent = '—';
+    return;
+  }
+  const entries = data || [];
+  $('#queue-summary-waiting').textContent = entries.filter(e => ['waiting','called','stepped_away'].includes(e.status)).length;
+  $('#queue-summary-consulting').textContent = entries.filter(e => e.status === 'with_practitioner').length;
+  $('#queue-summary-completed').textContent = entries.filter(e => e.status === 'completed').length;
+}
+
+$('#queue-summary-open-btn').addEventListener('click', () => {
+  showScreen('screen-queue');
+  loadQueue();
+});
 
 function renderToday(){
   const finishedQueueStatuses = ['completed','left'];
