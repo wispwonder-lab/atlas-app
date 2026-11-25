@@ -23,6 +23,7 @@
   .status-card.with_practitioner{ background:#ede9fe; }
   .status-card.completed{ background:var(--success-bg); }
   .status-card.error{ background:var(--error-bg); }
+  .status-card.not_completed{ background:var(--warning-bg); }
   h1{ font-size:24px; margin:0 0 8px; }
   .status-detail{ color:var(--text-muted); margin:0; }
   .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
@@ -94,7 +95,7 @@ async function checkStatus(){
   }
 
   if(entry.status === 'not_completed'){
-    showFinalState('error', 'Your visit was not completed today', 'Please contact reception if you would like to arrange another appointment.');
+    showFinalState('not_completed', 'Your visit was not completed today', 'Please contact reception if you would like to arrange another appointment.');
     return;
   }
 
