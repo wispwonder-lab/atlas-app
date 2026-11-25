@@ -607,7 +607,6 @@ function startReceptionRealtime(){
     .on('postgres_changes', { event:'*', schema:'public', table:'appointments', filter:'practice_id=eq.' + staffPracticeId }, () => {
       if(!$('#screen-today').hidden) loadToday();
       if(!$('#screen-ps').hidden) renderPsResults($('#ps-select').value);
-      if(!$('#screen-eod').hidden) renderEndOfDay();
     })
     .on('postgres_changes', { event:'*', schema:'public', table:'queue_entries', filter:'practice_id=eq.' + staffPracticeId }, () => {
       if(!$('#screen-today').hidden) loadToday();
@@ -2015,7 +2014,7 @@ async function endDayAndClearQueue(){
   }
   $('#eod-action-area').textContent = (data || 0) + ' unfinished queue entr' + ((data || 0) === 1 ? 'y' : 'ies') + ' moved to Not Completed. Appointment records were kept.';
   announce((data || 0) + ' unfinished queue entries moved to Not Completed. The active queue has been cleared.');
-  await renderEndOfDay();
+  await renderNotCompletedQueue();
 }
 
 $('#eod-clear-queue-btn').addEventListener('click', endDayAndClearQueue);
