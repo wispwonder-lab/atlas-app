@@ -93,6 +93,11 @@ async function checkStatus(){
     return;
   }
 
+  if(entry.status === 'not_completed'){
+    showFinalState('error', 'Your visit was not completed today', 'Please contact reception if you would like to arrange another appointment.');
+    return;
+  }
+
   let info;
   const isNewOverride = entry.last_override_at && entry.last_override_at !== lastKnownOverrideAt;
 
