@@ -598,7 +598,7 @@ async function archivePreviousDayQueueEntries(){
     p_end: start,
     p_location_id: staffLocationId || null
   });
-  if(error) showError('We could not close yesterday\'s unfinished queue entries automatically. Technical detail: ' + error.message);
+  return error ? ('We could not close yesterday\'s unfinished queue entries automatically. Technical detail: ' + error.message) : null;
 }
 
 function startReceptionRealtime(){
@@ -644,10 +644,11 @@ async function handleLoggedIn(user){
   $('#page-title').textContent = 'Hi, ' + roleRow.full_name.split(' ')[0];
   $('#logout-btn').hidden = false;
 
-  await archivePreviousDayQueueEntries();
-  startReceptionRealtime();
   showScreen('screen-today');
+  const archiveError = await archivePreviousDayQueueEntries();
+  startReceptionRealtime();
   await loadToday();
+  if(archiveError) showError(archiveError);
 }
 
 async function loadToday(){
